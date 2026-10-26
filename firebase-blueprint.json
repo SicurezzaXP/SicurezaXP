@@ -1,0 +1,183 @@
+{
+  "entities": {
+    "Case": {
+      "title": "Case",
+      "description": "Registro de caso de atención al cliente de Sicurezza",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único correlativo del caso (ej. SIC-2026-0001)",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "maxLength": 64
+        },
+        "fechaIngreso": {
+          "type": "string",
+          "description": "Fecha y hora de recepción en zona horaria America/Lima",
+          "maxLength": 32
+        },
+        "canal": {
+          "type": "string",
+          "description": "Canal de atención al cliente",
+          "maxLength": 64
+        },
+        "tienda": {
+          "type": "string",
+          "description": "Tienda física o sede virtual relacionada",
+          "maxLength": 64
+        },
+        "clienteNombre": {
+          "type": "string",
+          "description": "Nombre y apellidos de la clienta",
+          "maxLength": 150
+        },
+        "clienteDocumento": {
+          "type": "string",
+          "description": "DNI, CE o RUC del cliente",
+          "maxLength": 30
+        },
+        "clienteTelefono": {
+          "type": "string",
+          "description": "Número de teléfono o WhatsApp de contacto",
+          "maxLength": 30
+        },
+        "clienteEmail": {
+          "type": "string",
+          "description": "Correo electrónico de contacto",
+          "maxLength": 100
+        },
+        "numeroPedido": {
+          "type": "string",
+          "description": "Número de pedido web o boleta de venta",
+          "maxLength": 50
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Motivo principal del caso",
+          "maxLength": 100
+        },
+        "subcategory": {
+          "type": "string",
+          "description": "Línea o prenda específica",
+          "maxLength": 100
+        },
+        "estado": {
+          "type": "string",
+          "description": "Estado operativo del caso",
+          "enum": ["Pendiente", "En gestión", "Resuelto", "Derivado", "Anulado"],
+          "maxLength": 30
+        },
+        "prioridad": {
+          "type": "string",
+          "description": "Nivel de urgencia del caso",
+          "enum": ["Baja", "Media", "Alta", "Urgente"],
+          "maxLength": 20
+        },
+        "descripcion": {
+          "type": "string",
+          "description": "Detalle explicativo del caso",
+          "maxLength": 2000
+        },
+        "solucionAccion": {
+          "type": "string",
+          "description": "Acción tomada o resolución",
+          "maxLength": 2000
+        },
+        "asesorResponsable": {
+          "type": "string",
+          "description": "Nombre del asesor responsable del caso",
+          "maxLength": 100
+        },
+        "tiempoResolucionDias": {
+          "type": "number",
+          "description": "Tiempo en días hábiles tomado para resolver el caso"
+        },
+        "clienteConforme": {
+          "type": "string",
+          "description": "Conformidad expresada por la clienta",
+          "enum": ["Sí", "No", "En seguimiento"],
+          "maxLength": 20
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Bandera de desactivación lógica (soft delete)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Fecha y hora de creación del registro en el sistema",
+          "maxLength": 40
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Identificador o email del usuario creador",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Fecha y hora de última modificación",
+          "maxLength": 40
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Identificador o email del último editor",
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "fechaIngreso",
+        "canal",
+        "tienda",
+        "clienteNombre",
+        "clienteTelefono",
+        "categoria",
+        "estado",
+        "prioridad",
+        "descripcion",
+        "asesorResponsable"
+      ]
+    },
+    "User": {
+      "title": "User",
+      "description": "Perfil de usuario y asignación de rol en el sistema",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "analyst", "agent"],
+          "maxLength": 20
+        },
+        "storeAccess": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/cases/{caseId}": {
+      "schema": "Case",
+      "description": "Colección principal de casos de atención al cliente de Sicurezza"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfiles y roles de los operadores del sistema"
+    },
+    "/_connection_test/{docId}": {
+      "schema": "User",
+      "description": "Ruta de prueba de diagnóstico para verificar conectividad y escritura"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SICUREZZA XP",
+  "description": "Sistema Web de Gestión y Analítica de Casos ATC — Sicurezza XP",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -10,15 +10,17 @@ import {
   ShieldCheck,
   FileQuestion,
   Layers,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type NavTab = 'dashboard' | 'new_case' | 'explorer' | 'configurator' | 'reports' | 'migration';
+export type NavTab = 'dashboard' | 'new_case' | 'explorer' | 'followups' | 'configurator' | 'reports' | 'migration';
 
 interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   totalCasesCount: number;
+  followUpsCount?: number;
   onOpenFieldConfigurator: () => void;
 }
 
@@ -26,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   totalCasesCount,
+  followUpsCount,
   onOpenFieldConfigurator,
 }) => {
   const { user } = useAuth();
@@ -51,6 +54,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Base de Casos',
       icon: <TableProperties className="w-4 h-4" />,
       badge: totalCasesCount,
+    },
+    {
+      id: 'followups',
+      label: 'Seguimientos & Alertas',
+      icon: <Bell className="w-4 h-4" />,
+      badge: followUpsCount,
     },
     {
       id: 'configurator',

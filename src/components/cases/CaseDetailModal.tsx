@@ -19,9 +19,12 @@ import {
   ShieldAlert,
   CheckCheck,
   Trash2,
+  Bell,
+  AlertTriangle,
 } from 'lucide-react';
 import { CaseItem } from '../../types/case';
 import { formatDisplayDateOnly } from '../../utils/dateUtils';
+import { getCaseFollowUpInfo } from '../../utils/followUpUtils';
 
 interface CaseDetailModalProps {
   caseItem: CaseItem | null;
@@ -48,6 +51,7 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
   const tipo = caseItem.tipoCaso || 'Solicitud';
   const motive = caseItem.motivo || caseItem.categoria || '-';
   const isOpen = caseItem.estado === 'Abierto' || caseItem.estado === 'Pendiente' || caseItem.estado === 'En gestión';
+  const followUp = getCaseFollowUpInfo(caseItem);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
@@ -113,6 +117,31 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Follow-up / Alerta Status Card */}
+          {followUp.isNeeded && (
+            <div
+              className={`p-4 rounded-xl border flex items-center justify-between gap-3 animate-fade-in ${
+                followUp.urgency === 'vencido'
+                  ? 'bg-rose-50 border-rose-300 text-rose-900'
+                  : followUp.urgency === 'hoy'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : 'bg-blue-50 border-blue-200 text-blue-900'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Bell className="w-5 h-5 shrink-0 text-current" />
+                <div>
+                  <span className="font-extrabold text-xs block">
+                    {followUp.label} (Alerta programada cada {caseItem.frecuenciaSeguimientoDias || 2} días)
+                  </span>
+                  <span className="text-[11px] opacity-80">
+                    Fecha límite para contactar al cliente: <strong>{caseItem.fechaProximoSeguimiento || 'En proceso'}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Section 1: Datos Cliente */}
           <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-2.5">

@@ -59,6 +59,19 @@ export interface CaseItem {
   cierre: CaseCierre | string; // 33. Cierre * (Procede, No procede, Pendiente)
   fechaCierre?: string; // 34. Fecha de cierre
 
+  // 6. Alertas y Seguimiento Interno (Sicurezza XP)
+  requiereSeguimiento?: boolean;
+  fechaProximoSeguimiento?: string; // YYYY-MM-DD para la alerta (por defecto 2 días)
+  frecuenciaSeguimientoDias?: number; // ej. 2 días
+  ultimoSeguimientoFecha?: string;
+  seguimientoCumplido?: boolean;
+  historialSeguimientos?: Array<{
+    id: string;
+    fecha: string;
+    nota: string;
+    usuario: string;
+  }>;
+
   // Auditoría y trazabilidad
   isArchived?: boolean;
   createdAt: string;

@@ -11,14 +11,23 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+import { AlertsDropdown } from '../followups/AlertsDropdown';
+import { CaseItem } from '../../types/case';
+
 interface NavbarProps {
   onOpenFirebaseModal: () => void;
   onOpenFieldConfigurator: () => void;
+  cases?: CaseItem[];
+  onOpenFollowUpsView?: () => void;
+  onViewCaseDetail?: (item: CaseItem) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenFirebaseModal,
   onOpenFieldConfigurator,
+  cases = [],
+  onOpenFollowUpsView,
+  onViewCaseDetail,
 }) => {
   const { user, isFirebaseActive } = useAuth();
   const [peruTime, setPeruTime] = useState<string>('');
@@ -103,6 +112,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Sliders className="w-3.5 h-3.5 text-blue-600" />
             <span className="hidden sm:inline">Configurar Campos</span>
           </button>
+
+          {/* Quick Alerts Dropdown */}
+          {onOpenFollowUpsView && onViewCaseDetail && (
+            <AlertsDropdown
+              cases={cases}
+              onOpenFollowUpsView={onOpenFollowUpsView}
+              onViewCaseDetail={onViewCaseDetail}
+            />
+          )}
 
           {/* Single User Avatar (Administrador SICUREZZA XP) */}
           <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">

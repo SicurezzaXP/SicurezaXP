@@ -11,11 +11,13 @@ import { HistoricalMigrationView } from './components/migration/HistoricalMigrat
 import { FieldConfiguratorView } from './components/admin/FieldConfiguratorView';
 import { FieldConfiguratorModal } from './components/admin/FieldConfiguratorModal';
 import { FirebaseConfigModal } from './components/admin/FirebaseConfigModal';
+import { FollowUpsView } from './components/followups/FollowUpsView';
 import { CaseDetailModal } from './components/cases/CaseDetailModal';
 import { CaseEditModal } from './components/cases/CaseEditModal';
 import { CaseFilterState, CaseItem } from './types/case';
 import { subscribeToCases } from './services/db';
 import { calculateDatePresetRange, isDateInPeruRange } from './utils/dateUtils';
+import { getCaseFollowUpInfo } from './utils/followUpUtils';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -23,6 +25,7 @@ import {
   Sliders,
   FileSpreadsheet,
   Database,
+  Bell,
 } from 'lucide-react';
 
 function MainApp() {
@@ -126,10 +129,20 @@ function MainApp() {
     setFilters((prev) => ({ ...prev, ...partial }));
   };
 
+  // Follow-ups counter
+  const followUpsCount = useMemo(() => {
+    return allCases.filter((c) => !c.isArchived && getCaseFollowUpInfo(c).isNeeded).length;
+  }, [allCases]);
+
   const TOP_TABS: Array<{ id: NavTab; label: string; icon: React.ReactNode }> = [
     { id: 'dashboard', label: 'Métricas (BI)', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
     { id: 'new_case', label: 'Registrar Caso', icon: <PlusCircle className="w-3.5 h-3.5" /> },
     { id: 'explorer', label: 'Base de Casos', icon: <TableProperties className="w-3.5 h-3.5" /> },
+    {
+      id: 'followups',
+      label: `Seguimientos & Alertas ${followUpsCount > 0 ? `(${followUpsCount})` : ''}`,
+      icon: <Bell className="w-3.5 h-3.5" />,
+    },
     { id: 'configurator', label: 'Configurar Formulario', icon: <Sliders className="w-3.5 h-3.5" /> },
     { id: 'reports', label: 'Reportes & Excel', icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
     { id: 'migration', label: 'Migración Histórica', icon: <Database className="w-3.5 h-3.5" /> },
@@ -141,6 +154,9 @@ function MainApp() {
       <Navbar
         onOpenFirebaseModal={() => setIsFirebaseModalOpen(true)}
         onOpenFieldConfigurator={() => setIsFieldConfigOpen(true)}
+        cases={allCases}
+        onOpenFollowUpsView={() => setCurrentTab('followups')}
+        onViewCaseDetail={(c) => setSelectedCaseForDetail(c)}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row w-full">
@@ -149,6 +165,7 @@ function MainApp() {
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
           totalCasesCount={allCases.filter((c) => !c.isArchived).length}
+          followUpsCount={followUpsCount}
           onOpenFieldConfigurator={() => setIsFieldConfigOpen(true)}
         />
 
@@ -215,6 +232,13 @@ function MainApp() {
             <CaseExplorerView
               cases={allCases}
               onExportFiltered={() => setCurrentTab('reports')}
+            />
+          )}
+
+          {currentTab === 'followups' && (
+            <FollowUpsView
+              cases={allCases}
+              onViewCaseDetail={(c) => setSelectedCaseForDetail(c)}
             />
           )}
 

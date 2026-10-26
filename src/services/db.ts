@@ -240,6 +240,40 @@ export async function archiveCase(
 }
 
 /**
+ * Registrar una acción o nota de seguimiento sobre un caso
+ */
+export async function addCaseFollowUpNote(
+  caseId: string,
+  nota: string,
+  usuario: string,
+  marcarCumplido?: boolean,
+  proximaFecha?: string
+): Promise<void> {
+  const localList = getLocalCases();
+  const current = localList.find((c) => c.id === caseId);
+  const nowIso = new Date().toISOString();
+
+  const newEntry = {
+    id: `seg-${Date.now()}`,
+    fecha: nowIso,
+    nota,
+    usuario,
+  };
+
+  const existingHistory = current?.historialSeguimientos || [];
+  const updatedHistory = [newEntry, ...existingHistory];
+
+  const updates: Partial<CaseItem> = {
+    historialSeguimientos: updatedHistory,
+    ultimoSeguimientoFecha: nowIso,
+    ...(marcarCumplido !== undefined ? { seguimientoCumplido: marcarCumplido } : {}),
+    ...(proximaFecha ? { fechaProximoSeguimiento: proximaFecha } : {}),
+  };
+
+  await updateCase(caseId, updates, usuario);
+}
+
+/**
  * Eliminar permanentemente un caso de Firestore y del almacenamiento
  */
 export async function deleteCase(id: string): Promise<void> {

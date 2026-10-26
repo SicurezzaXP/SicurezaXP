@@ -21,11 +21,15 @@ import {
   RotateCcw,
   Plus,
   Database,
+  Bell,
+  Check,
+  Info,
 } from 'lucide-react';
-import { addCase, generateCaseId } from '../../services/db';
+import { addCase } from '../../services/db';
 import { isFirebaseConfigured } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { getPeruDateString } from '../../utils/dateUtils';
+import { addDaysToDate } from '../../utils/followUpUtils';
 import {
   getStoredFormFields,
   FORM_FIELDS_UPDATED_EVENT,
@@ -45,13 +49,14 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   onOpenFirebaseModal,
 }) => {
   const { user } = useAuth();
+  const today = getPeruDateString();
 
   // Load configured fields dynamically
   const [configuredFields, setConfiguredFields] = useState<FormFieldConfig[]>(() =>
     getStoredFormFields()
   );
 
-  // Form values state: key-value dictionary for all field IDs
+  // Form values state
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,7 +86,6 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
 
   // Initialize form default values
   useEffect(() => {
-    const today = getPeruDateString();
     const defaults: Record<string, any> = {
       fechaIngreso: today,
       fechaVenta: today,
@@ -100,6 +104,8 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
       estado: 'Abierto',
       cierre: 'Pendiente',
       cantidad: 1,
+      requiereSeguimiento: true,
+      frecuenciaSeguimientoDias: 2,
     };
 
     // For any custom field with options, pick first option by default
@@ -118,7 +124,7 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
     });
 
     setFormValues((prev) => ({ ...defaults, ...prev }));
-  }, [configuredFields]);
+  }, [configuredFields, today]);
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections((prev) => ({
@@ -138,19 +144,60 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
     }
   };
 
+  const handleSelectCaseType = (type: string) => {
+    if (type === 'Consulta') {
+      setFormValues((prev) => ({
+        ...prev,
+        tipoCaso: 'Consulta',
+        motivo: prev.motivo || 'Stock y Disponibilidad',
+        solucionBrindada: prev.solucionBrindada || 'Orientación / Información',
+        cerroEnFcr: 'Sí',
+        estado: 'Cerrado',
+        cierre: 'Procede',
+        requiereSeguimiento: false,
+        frecuenciaSeguimientoDias: 2,
+      }));
+    } else {
+      setFormValues((prev) => ({
+        ...prev,
+        tipoCaso: type,
+        estado: 'Abierto',
+        cierre: 'Pendiente',
+        requiereSeguimiento: true,
+        frecuenciaSeguimientoDias: 2,
+      }));
+    }
+    setValidationErrors({});
+  };
+
   // Validate form
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
+    const isConsulta = formValues.tipoCaso === 'Consulta';
 
-    configuredFields.forEach((field) => {
-      if (field.disabled) return; // Ignore disabled fields
-      if (field.required) {
-        const val = formValues[field.id];
-        if (val === undefined || val === null || String(val).trim() === '') {
-          errors[field.id] = `El campo "${field.label}" es obligatorio.`;
-        }
+    if (isConsulta) {
+      // In Consulta mode, only validate the basic essentials
+      if (!formValues.solicitudCliente || !String(formValues.solicitudCliente).trim()) {
+        errors.solicitudCliente = 'Por favor escribe qué consultó o preguntó el cliente.';
       }
-    });
+      if (!formValues.detalleSolucion || !String(formValues.detalleSolucion).trim()) {
+        errors.detalleSolucion = 'Por favor indica la respuesta o información brindada.';
+      }
+      if (!formValues.canal) {
+        errors.canal = 'Selecciona el canal de atención.';
+      }
+    } else {
+      // Full form validation for Solicitud, Reclamo, Queja, Libro de Reclamaciones
+      configuredFields.forEach((field) => {
+        if (field.disabled) return;
+        if (field.required) {
+          const val = formValues[field.id];
+          if (val === undefined || val === null || String(val).trim() === '') {
+            errors[field.id] = `El campo "${field.label}" es obligatorio.`;
+          }
+        }
+      });
+    }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -161,7 +208,6 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
     e.preventDefault();
 
     if (!validate()) {
-      // Find first section with error and expand it
       const firstErrorFieldId = Object.keys(validationErrors)[0];
       const errField = configuredFields.find((f) => f.id === firstErrorFieldId);
       if (errField) {
@@ -173,9 +219,14 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
     setIsSubmitting(true);
     try {
       const nowIso = new Date().toISOString();
-      const customData: Record<string, any> = {};
+      const isConsulta = formValues.tipoCaso === 'Consulta';
+      const requiresFollowUp = Boolean(formValues.requiereSeguimiento);
+      const followUpFrequency = Number(formValues.frecuenciaSeguimientoDias) || 2;
+      const proximoSeguimiento = requiresFollowUp
+        ? addDaysToDate(formValues.fechaIngreso || today, followUpFrequency)
+        : '';
 
-      // Standard field IDs
+      const customData: Record<string, any> = {};
       const standardKeys = new Set([
         'nroCasoDni',
         'nombresApellidos',
@@ -211,9 +262,10 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
         'estado',
         'cierre',
         'fechaCierre',
+        'requiereSeguimiento',
+        'frecuenciaSeguimientoDias',
       ]);
 
-      // Collect custom fields
       Object.keys(formValues).forEach((key) => {
         if (!standardKeys.has(key)) {
           const cfg = configuredFields.find((f) => f.id === key);
@@ -226,60 +278,83 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
         }
       });
 
+      // Resolved client name
+      const clientName = String(
+        formValues.nombresApellidos || (isConsulta ? 'Cliente Consulta General' : '')
+      ).trim();
+
       const newCase: any = {
-        nroCasoDni: String(formValues.nroCasoDni || ''),
-        nombresApellidos: String(formValues.nombresApellidos || ''),
-        fechaIngreso: formValues.fechaIngreso || getPeruDateString(),
+        nroCasoDni: String(formValues.nroCasoDni || (isConsulta ? 'Sin DNI' : '')).trim(),
+        nombresApellidos: clientName || 'Cliente Sicurezza',
+        fechaIngreso: formValues.fechaIngreso || today,
         canal: formValues.canal || 'WhatsApp',
-        telefonoCliente: String(formValues.telefonoCliente || ''),
-        correoCliente: String(formValues.correoCliente || ''),
-        numeroPedido: String(formValues.numeroPedido || ''),
-        numeroBoleta: String(formValues.numeroBoleta || ''),
-        campanaMkt: String(formValues.campanaMkt || ''),
-        origenVenta: formValues.origenVenta || 'Tda. Jockey Plaza',
-        fechaVenta: formValues.fechaVenta || getPeruDateString(),
-        tipoPago: formValues.tipoPago || 'Tarjeta',
-        producto: String(formValues.producto || ''),
-        sku: String(formValues.sku || ''),
+        telefonoCliente: String(formValues.telefonoCliente || (isConsulta ? 'N/A' : '')).trim(),
+        correoCliente: String(formValues.correoCliente || (isConsulta ? 'N/A' : '')).trim(),
+        numeroPedido: String(formValues.numeroPedido || (isConsulta ? 'N/A' : '')).trim(),
+        numeroBoleta: String(formValues.numeroBoleta || (isConsulta ? 'N/A' : '')).trim(),
+        campanaMkt: String(formValues.campanaMkt || (isConsulta ? 'N/A' : '')).trim(),
+        origenVenta: formValues.origenVenta || (isConsulta ? 'Canales Digitales' : 'Tda. Jockey Plaza'),
+        fechaVenta: formValues.fechaVenta || today,
+        tipoPago: formValues.tipoPago || (isConsulta ? 'N/A' : 'Tarjeta'),
+        producto: String(formValues.producto || (isConsulta ? 'Consulta de Producto' : '')).trim(),
+        sku: String(formValues.sku || (isConsulta ? 'N/A' : '')).trim(),
         cantidad: Number(formValues.cantidad) || 1,
-        talla: formValues.talla || 'M',
-        color: formValues.color || 'Beige',
-        tipoCaso: formValues.tipoCaso || 'Solicitud',
-        motivo: formValues.motivo || 'Producto',
+        talla: formValues.talla || (isConsulta ? 'N/A' : 'M'),
+        color: formValues.color || (isConsulta ? 'N/A' : 'Beige'),
+        tipoCaso: formValues.tipoCaso || (isConsulta ? 'Consulta' : 'Solicitud'),
+        motivo: formValues.motivo || (isConsulta ? 'Stock y Disponibilidad' : 'Producto'),
         submotivo: formValues.submotivo || '',
         fechaDerivacion: formValues.fechaDerivacion || '',
-        solicitudCliente: String(formValues.solicitudCliente || ''),
+        solicitudCliente: String(formValues.solicitudCliente || '').trim(),
         quejaPersonalInvolucrado: formValues.quejaPersonalInvolucrado || 'N/A',
         sucursalQueja: formValues.sucursalQueja || 'N/A',
         fechaAtencion: formValues.fechaAtencion || '',
         horarioAtencion: formValues.horarioAtencion || '',
-        solucionBrindada: formValues.solucionBrindada || 'Cambio - Talla',
-        cerroEnFcr: formValues.cerroEnFcr || 'Sí',
+        solucionBrindada: formValues.solucionBrindada || (isConsulta ? 'Orientación / Información' : 'Cambio - Talla'),
+        cerroEnFcr: formValues.cerroEnFcr || (isConsulta ? (requiresFollowUp ? 'No' : 'Sí') : 'Sí'),
         fechaRespuesta: formValues.fechaRespuesta || '',
-        detalleSolucion: String(formValues.detalleSolucion || ''),
+        detalleSolucion: String(formValues.detalleSolucion || '').trim(),
         sustentosAtencion: formValues.sustentosAtencion || '',
-        estado: formValues.estado || 'Abierto',
-        cierre: formValues.cierre || 'Pendiente',
-        fechaCierre: formValues.fechaCierre || '',
-        prioridad: 'Media',
+        estado: isConsulta ? (requiresFollowUp ? 'Abierto' : 'Cerrado') : (formValues.estado || 'Abierto'),
+        cierre: formValues.cierre || (isConsulta ? 'Procede' : 'Pendiente'),
+        fechaCierre: !requiresFollowUp && (formValues.estado === 'Cerrado' || isConsulta) ? today : '',
+        prioridad: isConsulta ? 'Baja' : (formValues.tipoCaso === 'Reclamo' ? 'Alta' : 'Media'),
         asesorResponsable: user?.displayName || 'Administrador SICUREZZA XP',
+        
+        // Follow-up Alert Fields
+        requiereSeguimiento: requiresFollowUp,
+        fechaProximoSeguimiento: proximoSeguimiento,
+        frecuenciaSeguimientoDias: followUpFrequency,
+        seguimientoCumplido: !requiresFollowUp,
+        historialSeguimientos: requiresFollowUp
+          ? [
+              {
+                id: `seg-${Date.now()}`,
+                fecha: nowIso,
+                nota: 'Caso ingresado en seguimiento. Alerta interna programada en 2 días.',
+                usuario: user?.displayName || 'Administrador SICUREZZA XP',
+              },
+            ]
+          : [],
+
         createdAt: nowIso,
         createdBy: user?.email || 'info@sicurezza.pe',
         updatedAt: nowIso,
         updatedBy: user?.email || 'info@sicurezza.pe',
+
         // Retrocompatibilidad
-        tienda: formValues.origenVenta || 'Tda. Jockey Plaza',
-        categoria: formValues.motivo || 'Producto',
-        clienteNombre: String(formValues.nombresApellidos || ''),
-        clienteDocumento: String(formValues.nroCasoDni || ''),
-        clienteTelefono: String(formValues.telefonoCliente || ''),
-        clienteEmail: String(formValues.correoCliente || ''),
-        descripcion: String(formValues.solicitudCliente || ''),
-        solucionAccion: String(formValues.detalleSolucion || ''),
-        clienteConforme: formValues.cierre === 'Procede' ? 'Sí' : 'En seguimiento',
+        tienda: formValues.origenVenta || (isConsulta ? 'Canales Digitales' : 'Tda. Jockey Plaza'),
+        categoria: formValues.motivo || (isConsulta ? 'Stock y Disponibilidad' : 'Producto'),
+        clienteNombre: clientName || 'Cliente Sicurezza',
+        clienteDocumento: String(formValues.nroCasoDni || (isConsulta ? 'Sin DNI' : '')).trim(),
+        clienteTelefono: String(formValues.telefonoCliente || (isConsulta ? 'N/A' : '')).trim(),
+        clienteEmail: String(formValues.correoCliente || (isConsulta ? 'N/A' : '')).trim(),
+        descripcion: String(formValues.solicitudCliente || '').trim(),
+        solucionAccion: String(formValues.detalleSolucion || '').trim(),
+        clienteConforme: formValues.cerroEnFcr === 'Sí' ? 'Sí' : 'En proceso',
+        isArchived: false,
       };
 
-      // Only attach customFields if there are custom fields
       if (Object.keys(customData).length > 0) {
         newCase.customFields = customData;
       }
@@ -287,15 +362,10 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
       try {
         const created = await addCase(newCase);
         setCreatedCaseSuccess(created);
-
         if (onCaseCreated) {
           onCaseCreated(created.id);
         }
-      } catch (saveError: any) {
-        // If Firestore had a network/permissions error, check if the record was safely stored in local backup
-        console.warn('Caso guardado en modo local debido a Firestore:', saveError);
-        // The record is already safely stored in local storage by addCase
-        // Construct a createdCase object to show success to user
+      } catch (fbErr) {
         const fallbackCreated = {
           ...newCase,
           id: `SIC-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
@@ -316,7 +386,6 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   const handleResetForm = () => {
     setCreatedCaseSuccess(null);
     setValidationErrors({});
-    const today = getPeruDateString();
     setFormValues({
       fechaIngreso: today,
       fechaVenta: today,
@@ -347,40 +416,46 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
       solicitudCliente: '',
       detalleSolucion: '',
       sustentosAtencion: '',
+      requiereSeguimiento: true,
+      frecuenciaSeguimientoDias: 2,
     });
   };
 
-  // Get unique sections preserving official order
+  // Sections
   const activeSections = Array.from(
     new Set([...FORM_SECTIONS, ...configuredFields.map((f) => f.section).filter(Boolean)])
   );
 
-  // If case created successfully, show clean summary banner
+  const isConsultaMode = formValues.tipoCaso === 'Consulta';
+
+  // If case created successfully
   if (createdCaseSuccess) {
     return (
       <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm max-w-3xl mx-auto space-y-6 animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
           <CheckCircle2 className="w-9 h-9" />
         </div>
 
         <div className="text-center space-y-1">
           <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-            Caso Registrado en Sicurezza XP
+            {createdCaseSuccess.tipoCaso === 'Consulta' ? 'Consulta Registrada' : 'Caso Registrado con Éxito'}
           </span>
-          <h2 className="text-2xl font-bold text-slate-900 pt-2">
+          <h2 className="text-2xl font-black text-slate-900 pt-2">
             Código: <span className="text-blue-700 font-mono">{createdCaseSuccess.id}</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500">
-            El caso ha sido guardado con éxito en la base de datos centralizada de Atención al Cliente.
+            {createdCaseSuccess.requiereSeguimiento
+              ? `El caso ha sido guardado y quedó programado para alerta de seguimiento en 2 días (${createdCaseSuccess.fechaProximoSeguimiento}).`
+              : 'El caso ha sido guardado con éxito en la base de datos centralizada de Atención al Cliente.'}
           </p>
         </div>
 
         {/* Case key details card */}
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <div>
-            <span className="text-slate-400 block font-medium">Cliente / DNI:</span>
+            <span className="text-slate-400 block font-medium">Cliente:</span>
             <span className="font-bold text-slate-800">
-              {createdCaseSuccess.nombresApellidos} ({createdCaseSuccess.nroCasoDni})
+              {createdCaseSuccess.nombresApellidos}
             </span>
           </div>
           <div>
@@ -397,19 +472,31 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
           </div>
           <div>
             <span className="text-slate-400 block font-medium">Estado:</span>
-            <span className={`inline-block font-bold px-2 py-0.5 rounded ${
-              createdCaseSuccess.estado === 'Abierto' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-            }`}>
-              {createdCaseSuccess.estado} ({createdCaseSuccess.cierre})
+            <span
+              className={`inline-block font-bold px-2 py-0.5 rounded text-[11px] ${
+                createdCaseSuccess.estado === 'Cerrado'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {createdCaseSuccess.estado}
             </span>
           </div>
           <div>
-            <span className="text-slate-400 block font-medium">Fecha de Ingreso:</span>
-            <span className="font-bold text-slate-800">{createdCaseSuccess.fechaIngreso}</span>
+            <span className="text-slate-400 block font-medium">FCR (Primer Contacto):</span>
+            <span className="font-bold text-slate-800">{createdCaseSuccess.cerroEnFcr}</span>
           </div>
           <div>
-            <span className="text-slate-400 block font-medium">FCR:</span>
-            <span className="font-bold text-slate-800">{createdCaseSuccess.cerroEnFcr}</span>
+            <span className="text-slate-400 block font-medium">Seguimiento:</span>
+            <span
+              className={`font-bold ${
+                createdCaseSuccess.requiereSeguimiento ? 'text-amber-700' : 'text-emerald-700'
+              }`}
+            >
+              {createdCaseSuccess.requiereSeguimiento
+                ? `Alerta programada (${createdCaseSuccess.fechaProximoSeguimiento})`
+                : 'Resuelto sin pendientes'}
+            </span>
           </div>
         </div>
 
@@ -428,23 +515,23 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto">
-      {/* Top Header Bar with Blue Theme and Configurator shortcut */}
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto animate-fade-in">
+      {/* Top Header Bar */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
-              Formulario de Atención al Cliente
+              Atención al Cliente Sicurezza
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              Estructura Oficial Sicurezza (34 campos)
+              SICUREZZA XP (Perú)
             </span>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-            Registrar Nuevo Caso ATC
+          <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+            Registrar Caso de Atención
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Completa los datos del cliente, la compra y el requerimiento. Los campos marcados con (*) son obligatorios.
+            Selecciona el tipo de caso. Si es una <strong>Consulta</strong>, solo se solicitarán datos básicos. Para <strong>Solicitudes, Reclamos o Quejas</strong>, se activará el seguimiento cada 2 días.
           </p>
         </div>
 
@@ -462,7 +549,7 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
                 }`}
               />
               <Database className="w-3.5 h-3.5 text-blue-600" />
-              <span>Probar Conexión</span>
+              <span>Conexión BD</span>
             </button>
           )}
 
@@ -471,12 +558,157 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
               type="button"
               onClick={onOpenFieldConfigurator}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 hover:border-blue-300 text-xs font-semibold transition-all cursor-pointer shrink-0"
-              title="Editar preguntas, opciones de listas desplegables o añadir nuevos campos"
+              title="Personalizar preguntas y listas desplegables"
             >
               <Sliders className="w-4 h-4 text-blue-600" />
-              <span>Personalizar Preguntas</span>
+              <span>Configurar Campos</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* PASO 1: SELECTOR PRINCIPAL DE TIPO DE CASO */}
+      <div className="bg-white rounded-2xl p-5 border-2 border-blue-200/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-[#161c36] text-white flex items-center justify-center font-bold text-xs">
+              1
+            </span>
+            <h3 className="font-extrabold text-slate-900 text-sm tracking-wide">
+              ¿Qué tipo de atención estás realizando?
+            </h3>
+          </div>
+          <span
+            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+              isConsultaMode
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-blue-50 text-blue-800 border-blue-200'
+            }`}
+          >
+            {isConsultaMode ? '⚡ Modo Consulta Rápida' : '📋 Caso con Seguimiento'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {/* Consulta */}
+          <button
+            type="button"
+            onClick={() => handleSelectCaseType('Consulta')}
+            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              formValues.tipoCaso === 'Consulta'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300 scale-[1.02]'
+                : 'bg-slate-50 hover:bg-blue-50/60 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <MessageSquare className="w-4 h-4" />
+              <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                formValues.tipoCaso === 'Consulta' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                Rápido
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="font-black text-xs block">Consulta</span>
+              <span className="text-[10px] opacity-80 block leading-tight">Stock, tallas, horarios</span>
+            </div>
+          </button>
+
+          {/* Solicitud */}
+          <button
+            type="button"
+            onClick={() => handleSelectCaseType('Solicitud')}
+            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              formValues.tipoCaso === 'Solicitud'
+                ? 'bg-[#161c36] text-white border-slate-900 shadow-md ring-2 ring-slate-400 scale-[1.02]'
+                : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <Layers className="w-4 h-4 text-cyan-400" />
+              <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                formValues.tipoCaso === 'Solicitud' ? 'bg-amber-400/30 text-amber-200' : 'bg-amber-100 text-amber-800'
+              }`}>
+                Seguimiento
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="font-black text-xs block">Solicitud</span>
+              <span className="text-[10px] opacity-80 block leading-tight">Cambio de talla / nota</span>
+            </div>
+          </button>
+
+          {/* Reclamo */}
+          <button
+            type="button"
+            onClick={() => handleSelectCaseType('Reclamo')}
+            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              formValues.tipoCaso === 'Reclamo'
+                ? 'bg-rose-700 text-white border-rose-700 shadow-md ring-2 ring-rose-400 scale-[1.02]'
+                : 'bg-slate-50 hover:bg-rose-50 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <AlertTriangle className="w-4 h-4 text-rose-300" />
+              <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                formValues.tipoCaso === 'Reclamo' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
+              }`}>
+                Alerta 48h
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="font-black text-xs block">Reclamo</span>
+              <span className="text-[10px] opacity-80 block leading-tight">Producto, calidad, demora</span>
+            </div>
+          </button>
+
+          {/* Queja ATC */}
+          <button
+            type="button"
+            onClick={() => handleSelectCaseType('Queja')}
+            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              formValues.tipoCaso === 'Queja'
+                ? 'bg-purple-800 text-white border-purple-800 shadow-md ring-2 ring-purple-400 scale-[1.02]'
+                : 'bg-slate-50 hover:bg-purple-50 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <ShieldAlert className="w-4 h-4 text-purple-300" />
+              <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                formValues.tipoCaso === 'Queja' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+              }`}>
+                Atención
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="font-black text-xs block">Queja ATC</span>
+              <span className="text-[10px] opacity-80 block leading-tight">Servicio en tienda</span>
+            </div>
+          </button>
+
+          {/* Libro de Reclamaciones */}
+          <button
+            type="button"
+            onClick={() => handleSelectCaseType('Libro de Reclamaciones')}
+            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              formValues.tipoCaso === 'Libro de Reclamaciones'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-300 scale-[1.02]'
+                : 'bg-slate-50 hover:bg-amber-50 border-slate-200 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <FileText className="w-4 h-4 text-amber-200" />
+              <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                formValues.tipoCaso === 'Libro de Reclamaciones' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}>
+                Legal
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="font-black text-xs block">Libro Reclamaciones</span>
+              <span className="text-[10px] opacity-80 block leading-tight">Reclamo formal</span>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -491,177 +723,459 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
             {Object.values(validationErrors).slice(0, 5).map((err, i) => (
               <li key={i}>{err}</li>
             ))}
-            {Object.keys(validationErrors).length > 5 && (
-              <li>... y {Object.keys(validationErrors).length - 5} más.</li>
-            )}
           </ul>
         </div>
       )}
 
-      {/* DYNAMIC SECTIONS */}
-      {activeSections.map((sectionName, sIdx) => {
-        const fieldsInSection = configuredFields.filter(
-          (f) => f.section === sectionName && !f.disabled
-        );
-        if (fieldsInSection.length === 0) return null;
-
-        const isExpanded = expandedSections[sectionName] ?? true;
-
-        // Icons for official sections
-        const getSectionIcon = () => {
-          switch (sectionName) {
-            case 'Registro datos cliente':
-              return <User className="w-4 h-4 text-blue-400" />;
-            case 'Datos de la compra':
-              return <ShoppingBag className="w-4 h-4 text-blue-400" />;
-            case 'Registro Caso':
-              return <MessageSquare className="w-4 h-4 text-blue-400" />;
-            case 'Queja ATC':
-              return <ShieldAlert className="w-4 h-4 text-blue-400" />;
-            case 'Finalización del caso':
-              return <CheckCheck className="w-4 h-4 text-blue-400" />;
-            default:
-              return <Layers className="w-4 h-4 text-blue-400" />;
-          }
-        };
-
-        return (
-          <div
-            key={sectionName}
-            className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-all"
-          >
-            {/* Section Header */}
-            <button
-              type="button"
-              onClick={() => toggleSection(sectionName)}
-              className="w-full bg-[#161c36] text-white px-5 py-3.5 flex items-center justify-between text-left cursor-pointer hover:bg-[#1a2142] transition-colors"
-            >
-              <div className="flex items-center gap-2.5">
-                {getSectionIcon()}
-                <span className="font-bold text-sm tracking-wide">{sectionName}</span>
-                <span className="text-xs text-blue-200 font-medium px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-700">
-                  {fieldsInSection.length} preguntas
-                </span>
-              </div>
-              <span className="text-xs text-blue-300 font-medium">
-                {isExpanded ? 'Contraer ▲' : 'Desplegar ▼'}
+      {/* ======================================================== */}
+      {/* MODO 1: CONSULTA RÁPIDA (SOLO DATOS BÁSICOS)            */}
+      {/* ======================================================== */}
+      {isConsultaMode ? (
+        <div className="bg-white rounded-2xl border-2 border-blue-200 p-6 space-y-6 shadow-xs animate-fade-in">
+          <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block">
+                Formulario Simplificado
               </span>
-            </button>
+              <h3 className="text-base font-extrabold text-slate-900">
+                Datos Básicos de la Consulta
+              </h3>
+            </div>
+            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-full font-medium">
+              No requiere DNI ni número de boleta obligatorios
+            </span>
+          </div>
 
-            {/* Section Fields Body */}
-            {isExpanded && (
-              <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                {fieldsInSection.map((field) => {
-                  const val = formValues[field.id] ?? '';
-                  const hasError = Boolean(validationErrors[field.id]);
+          {/* Grid de campos básicos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Cliente */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                  Nombre del Cliente
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('nombresApellidos', 'Cliente Consulta General')}
+                  className="text-[10px] text-blue-600 hover:underline font-semibold"
+                >
+                  (Anónimo / General)
+                </button>
+              </div>
+              <input
+                type="text"
+                value={formValues.nombresApellidos || ''}
+                placeholder="Ej. Andrea Gómez (o dejar vacío)"
+                onChange={(e) => handleInputChange('nombresApellidos', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-                  // Full width for textareas or special fields
-                  const isFullWidth =
-                    field.type === 'textarea' ||
-                    field.id === 'solicitudCliente' ||
-                    field.id === 'detalleSolucion' ||
-                    field.id === 'submotivo';
+            {/* Canal */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                Canal de Atención <span className="text-rose-600">*</span>
+              </label>
+              <select
+                value={formValues.canal || 'WhatsApp'}
+                onChange={(e) => handleInputChange('canal', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Instagram">Instagram</option>
+                <option value="TikTok">TikTok</option>
+                <option value="info@sicurezza.pe">Correo info@sicurezza.pe</option>
+                <option value="Presencial Tienda">Presencial Tienda</option>
+                <option value="Teléfono">Llamada Telefónica</option>
+              </select>
+            </div>
 
-                  return (
-                    <div
-                      key={field.id}
-                      className={isFullWidth ? 'col-span-1 md:col-span-2 lg:col-span-3' : 'col-span-1'}
+            {/* Teléfono / WhatsApp (Opcional) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                Teléfono / WhatsApp <span className="text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={formValues.telefonoCliente || ''}
+                placeholder="Ej. 998877665"
+                onChange={(e) => handleInputChange('telefonoCliente', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Motivo de Consulta */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                Motivo de Consulta <span className="text-rose-600">*</span>
+              </label>
+              <select
+                value={formValues.motivo || 'Stock y Disponibilidad'}
+                onChange={(e) => handleInputChange('motivo', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Stock y Disponibilidad">Stock y Disponibilidad de Producto</option>
+                <option value="Tallas y Medidas">Guía de Tallas y Asesoría de Medidas</option>
+                <option value="Tiendas y Horarios">Ubicación y Horarios de Tiendas Físicas</option>
+                <option value="Tiempos de Envío">Tiempos y Costos de Envío / Courier</option>
+                <option value="Promociones y Precios">Promociones, Descuentos y Cupones</option>
+                <option value="Estado de Pedido">Consulta de Pedido Existente</option>
+                <option value="Otro">Otra Consulta General</option>
+              </select>
+            </div>
+
+            {/* Origen / Tienda Consultada (Opcional) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                Tienda o Sede <span className="text-slate-400 font-normal">(Opcional)</span>
+              </label>
+              <select
+                value={formValues.origenVenta || 'Canales Digitales'}
+                onChange={(e) => handleInputChange('origenVenta', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Canales Digitales">Canales Digitales / Web</option>
+                <option value="Tda. Jockey Plaza">Tda. Jockey Plaza</option>
+                <option value="Tda. El Polo">Tda. El Polo</option>
+                <option value="Tda. San Miguel">Tda. San Miguel</option>
+                <option value="Tda. Salaverry">Tda. Salaverry</option>
+                <option value="Tda. Alcázar">Tda. Alcázar</option>
+                <option value="Tda. Mall Plaza Trujillo">Tda. Mall Plaza Trujillo</option>
+                <option value="Tda. Arequipa">Tda. Arequipa</option>
+              </select>
+            </div>
+
+            {/* Número de Pedido (Opcional) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                N° de Pedido <span className="text-slate-400 font-normal">(Solo si aplica)</span>
+              </label>
+              <input
+                type="text"
+                value={formValues.numeroPedido || ''}
+                placeholder="Ej. #12845 (o dejar vacío)"
+                onChange={(e) => handleInputChange('numeroPedido', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
+            </div>
+
+            {/* Pregunta del cliente */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                ¿Qué consultó el cliente? <span className="text-rose-600">*</span>
+              </label>
+              <textarea
+                rows={2}
+                value={formValues.solicitudCliente || ''}
+                placeholder="Ej. Preguntó si hay stock del Bra Invisible en talla M color Beige en Jockey Plaza."
+                onChange={(e) => handleInputChange('solicitudCliente', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {validationErrors.solicitudCliente && (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                  {validationErrors.solicitudCliente}
+                </p>
+              )}
+            </div>
+
+            {/* Respuesta brindada */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-3">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                Respuesta o Solución Brindada <span className="text-rose-600">*</span>
+              </label>
+              <textarea
+                rows={2}
+                value={formValues.detalleSolucion || ''}
+                placeholder="Ej. Se le confirmó que sí hay stock disponible en tienda y se le enviaron los horarios de atención."
+                onChange={(e) => handleInputChange('detalleSolucion', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {validationErrors.detalleSolucion && (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                  {validationErrors.detalleSolucion}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Opciones de Cierre & Alerta para la Consulta */}
+          <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-900 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formValues.requiereSeguimiento)}
+                    onChange={(e) =>
+                      setFormValues((prev) => ({
+                        ...prev,
+                        requiereSeguimiento: e.target.checked,
+                        estado: e.target.checked ? 'Abierto' : 'Cerrado',
+                      }))
+                    }
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span>¿Requiere seguimiento posterior con alerta en 2 días?</span>
+                </label>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {formValues.requiereSeguimiento
+                    ? `Quedará en estado "Abierto" y se generará una alerta interna el ${addDaysToDate(today, 2)}.`
+                    : 'Quedará registrado como caso "Cerrado" (Resuelto en primer contacto FCR).'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold text-slate-600">FCR:</span>
+              <button
+                type="button"
+                onClick={() =>
+                  handleInputChange('cerroEnFcr', formValues.cerroEnFcr === 'Sí' ? 'No' : 'Sí')
+                }
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                  formValues.cerroEnFcr === 'Sí'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {formValues.cerroEnFcr === 'Sí' ? '✅ Resuelto al Instante' : '⏳ En Proceso'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ======================================================== */
+        /* MODO 2: CASO COMPLETO (SOLICITUD / RECLAMO / QUEJA)       */
+        /* ======================================================== */
+        <div className="space-y-6">
+          {/* SEGUIMIENTO INTERNO ALERT BOX (PARA CASOS DE SEGUIMIENTO) */}
+          <div className="bg-gradient-to-r from-blue-900 via-[#161c36] to-slate-900 text-white rounded-2xl p-5 border border-blue-900/60 shadow-md space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300">
+                  <Bell className="w-4 h-4 text-cyan-300" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                    Sistema de Alertas y Seguimiento Interno
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+                      Cadencia 48h
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-300">
+                    Alerta automática si el caso no se resuelve dentro del plazo acordado.
+                  </p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl border border-white/20 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formValues.requiereSeguimiento)}
+                  onChange={(e) =>
+                    handleInputChange('requiereSeguimiento', e.target.checked)
+                  }
+                  className="w-4 h-4 text-blue-500 rounded focus:ring-blue-400"
+                />
+                <span className="text-xs font-bold text-white">
+                  Activar Alerta de Seguimiento
+                </span>
+              </label>
+            </div>
+
+            {formValues.requiereSeguimiento && (
+              <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-blue-200">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-300">Alertar cada:</span>
+                  {[1, 2, 3, 5].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => handleInputChange('frecuenciaSeguimientoDias', d)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        (formValues.frecuenciaSeguimientoDias || 2) === d
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-white/10 hover:bg-white/20 text-slate-300'
+                      }`}
                     >
-                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
-                        {field.label}
-                        {field.required && (
-                          <span className="text-rose-600 font-bold ml-1" title="Obligatorio">
-                            *
-                          </span>
-                        )}
-                      </label>
+                      {d} día{d > 1 ? 's' : ''}
+                    </button>
+                  ))}
+                </div>
 
-                      {field.description && (
-                        <p className="text-[11px] text-slate-500 mb-1.5 italic">
-                          {field.description}
-                        </p>
-                      )}
-
-                      {/* Field Input Based on Type */}
-                      {field.type === 'select' ? (
-                        <select
-                          value={val}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        >
-                          <option value="">Seleccionar una opción...</option>
-                          {field.options?.map((opt, oi) => (
-                            <option key={oi} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      ) : field.type === 'textarea' ? (
-                        <textarea
-                          rows={3}
-                          value={val}
-                          placeholder={field.placeholder || 'Escribe aquí los detalles...'}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        />
-                      ) : field.type === 'date' ? (
-                        <input
-                          type="date"
-                          value={val}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        />
-                      ) : field.type === 'time' ? (
-                        <input
-                          type="time"
-                          value={val}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        />
-                      ) : field.type === 'number' ? (
-                        <input
-                          type="number"
-                          min={1}
-                          value={val}
-                          placeholder={field.placeholder || '1'}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={val}
-                          placeholder={field.placeholder || ''}
-                          onChange={(e) => handleInputChange(field.id, e.target.value)}
-                          className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                            hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
-                          }`}
-                        />
-                      )}
-
-                      {hasError && (
-                        <p className="text-[11px] text-rose-600 font-semibold mt-1">
-                          {validationErrors[field.id]}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                <div className="font-mono text-cyan-300 font-bold bg-white/10 px-3 py-1 rounded-lg border border-white/10">
+                  Próxima Alerta: {addDaysToDate(formValues.fechaIngreso || today, formValues.frecuenciaSeguimientoDias || 2)}
+                </div>
               </div>
             )}
           </div>
-        );
-      })}
+
+          {/* DYNAMIC FORM SECTIONS */}
+          {activeSections.map((sectionName) => {
+            const fieldsInSection = configuredFields.filter(
+              (f) => f.section === sectionName && !f.disabled
+            );
+            if (fieldsInSection.length === 0) return null;
+
+            const isExpanded = expandedSections[sectionName] ?? true;
+
+            const getSectionIcon = () => {
+              switch (sectionName) {
+                case 'Registro datos cliente':
+                  return <User className="w-4 h-4 text-blue-400" />;
+                case 'Datos de la compra':
+                  return <ShoppingBag className="w-4 h-4 text-blue-400" />;
+                case 'Registro Caso':
+                  return <MessageSquare className="w-4 h-4 text-blue-400" />;
+                case 'Queja ATC':
+                  return <ShieldAlert className="w-4 h-4 text-blue-400" />;
+                case 'Finalización del caso':
+                  return <CheckCheck className="w-4 h-4 text-blue-400" />;
+                default:
+                  return <Layers className="w-4 h-4 text-blue-400" />;
+              }
+            };
+
+            return (
+              <div
+                key={sectionName}
+                className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-all"
+              >
+                {/* Section Header */}
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionName)}
+                  className="w-full bg-[#161c36] text-white px-5 py-3.5 flex items-center justify-between text-left cursor-pointer hover:bg-[#1a2142] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {getSectionIcon()}
+                    <span className="font-bold text-sm tracking-wide">{sectionName}</span>
+                    <span className="text-xs text-blue-200 font-medium px-2 py-0.5 rounded-full bg-blue-900/60 border border-blue-700">
+                      {fieldsInSection.length} preguntas
+                    </span>
+                  </div>
+                  <span className="text-xs text-blue-300 font-medium">
+                    {isExpanded ? 'Contraer ▲' : 'Desplegar ▼'}
+                  </span>
+                </button>
+
+                {/* Section Fields Body */}
+                {isExpanded && (
+                  <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                    {fieldsInSection.map((field) => {
+                      const val = formValues[field.id] ?? '';
+                      const hasError = Boolean(validationErrors[field.id]);
+
+                      const isFullWidth =
+                        field.type === 'textarea' ||
+                        field.id === 'solicitudCliente' ||
+                        field.id === 'detalleSolucion' ||
+                        field.id === 'submotivo';
+
+                      return (
+                        <div
+                          key={field.id}
+                          className={isFullWidth ? 'col-span-1 md:col-span-2 lg:col-span-3' : 'col-span-1'}
+                        >
+                          <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                            {field.label}
+                            {field.required && (
+                              <span className="text-rose-600 font-bold ml-1" title="Obligatorio">
+                                *
+                              </span>
+                            )}
+                          </label>
+
+                          {field.description && (
+                            <p className="text-[11px] text-slate-500 mb-1.5 italic">
+                              {field.description}
+                            </p>
+                          )}
+
+                          {field.type === 'select' ? (
+                            <select
+                              value={val}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            >
+                              <option value="">Seleccionar una opción...</option>
+                              {field.options?.map((opt, oi) => (
+                                <option key={oi} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          ) : field.type === 'textarea' ? (
+                            <textarea
+                              rows={3}
+                              value={val}
+                              placeholder={field.placeholder || 'Escribe aquí los detalles...'}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl p-3 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            />
+                          ) : field.type === 'date' ? (
+                            <input
+                              type="date"
+                              value={val}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            />
+                          ) : field.type === 'time' ? (
+                            <input
+                              type="time"
+                              value={val}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            />
+                          ) : field.type === 'number' ? (
+                            <input
+                              type="number"
+                              min={1}
+                              value={val}
+                              placeholder={field.placeholder || '1'}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={val}
+                              placeholder={field.placeholder || ''}
+                              onChange={(e) => handleInputChange(field.id, e.target.value)}
+                              className={`w-full bg-slate-50 border rounded-xl px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                hasError ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                            />
+                          )}
+
+                          {hasError && (
+                            <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                              {validationErrors[field.id]}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Submit Button Bar */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -681,10 +1195,16 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer active:scale-98"
           >
             <Send className="w-4 h-4" />
-            <span>{isSubmitting ? 'Guardando...' : 'Guardar y Registrar Caso'}</span>
+            <span>
+              {isSubmitting
+                ? 'Guardando...'
+                : isConsultaMode
+                ? 'Guardar Consulta'
+                : 'Guardar Caso con Seguimiento'}
+            </span>
           </button>
         </div>
       </div>

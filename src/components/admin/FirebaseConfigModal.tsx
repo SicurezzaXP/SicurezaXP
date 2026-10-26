@@ -14,12 +14,21 @@ import {
   Sparkles,
   Server,
   CloudCheck,
+  Key,
+  Save,
+  Trash2,
+  Settings,
 } from 'lucide-react';
 import {
   isFirebaseConfigured,
   testFirestoreConnection,
   FirestoreDiagnosticResult,
   resolvedDatabaseId,
+  getStoredFirebaseConfig,
+  saveStoredFirebaseConfig,
+  clearStoredFirebaseConfig,
+  FirebaseCredentials,
+  getFirebaseEnvStatus,
 } from '../../services/firebase';
 import { resetDemoData, addCase } from '../../services/db';
 
@@ -36,15 +45,78 @@ export const FirebaseConfigModal: React.FC<FirebaseConfigModalProps> = ({ isOpen
   const [isRegisteringTest, setIsRegisteringTest] = useState(false);
   const [testRegisterResult, setTestRegisterResult] = useState<{ success: boolean; message: string; caseId?: string } | null>(null);
 
+  // In-app credentials configuration
+  const storedConfig = getStoredFirebaseConfig();
+  const envStatus = getFirebaseEnvStatus();
+  const [showConfigForm, setShowConfigForm] = useState(!isFirebaseConfigured);
+  const [rawSnippet, setRawSnippet] = useState('');
+  const [apiKey, setApiKey] = useState(storedConfig?.apiKey || '');
+  const [authDomain, setAuthDomain] = useState(storedConfig?.authDomain || '');
+  const [customProjectId, setCustomProjectId] = useState(storedConfig?.projectId || '');
+  const [storageBucket, setStorageBucket] = useState(storedConfig?.storageBucket || '');
+  const [messagingSenderId, setMessagingSenderId] = useState(storedConfig?.messagingSenderId || '');
+  const [appId, setAppId] = useState(storedConfig?.appId || '');
+  const [customDbId, setCustomDbId] = useState(storedConfig?.databaseId || '(default)');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
   if (!isOpen) return null;
 
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'sicurezzaxp';
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || storedConfig?.projectId || customProjectId || 'sicurezzaxp';
   const databaseId = resolvedDatabaseId;
 
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(id);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleSnippetPaste = (text: string) => {
+    setRawSnippet(text);
+    if (!text.trim()) return;
+
+    const apiKeyMatch = text.match(/apiKey["']?\s*:\s*["']([^"']+)["']/i);
+    if (apiKeyMatch) setApiKey(apiKeyMatch[1].trim());
+
+    const authDomainMatch = text.match(/authDomain["']?\s*:\s*["']([^"']+)["']/i);
+    if (authDomainMatch) setAuthDomain(authDomainMatch[1].trim());
+
+    const projectIdMatch = text.match(/projectId["']?\s*:\s*["']([^"']+)["']/i);
+    if (projectIdMatch) setCustomProjectId(projectIdMatch[1].trim());
+
+    const storageBucketMatch = text.match(/storageBucket["']?\s*:\s*["']([^"']+)["']/i);
+    if (storageBucketMatch) setStorageBucket(storageBucketMatch[1].trim());
+
+    const senderMatch = text.match(/messagingSenderId["']?\s*:\s*["']([^"']+)["']/i);
+    if (senderMatch) setMessagingSenderId(senderMatch[1].trim());
+
+    const appIdMatch = text.match(/appId["']?\s*:\s*["']([^"']+)["']/i);
+    if (appIdMatch) setAppId(appIdMatch[1].trim());
+  };
+
+  const handleSaveCredentials = () => {
+    if (!apiKey.trim() || !customProjectId.trim()) {
+      alert('Por favor completa al menos la API Key y el Project ID de Firebase.');
+      return;
+    }
+
+    const newConfig: FirebaseCredentials = {
+      apiKey: apiKey.trim(),
+      authDomain: authDomain.trim() || `${customProjectId.trim()}.firebaseapp.com`,
+      projectId: customProjectId.trim(),
+      storageBucket: storageBucket.trim() || `${customProjectId.trim()}.appspot.com`,
+      messagingSenderId: messagingSenderId.trim() || '123456789',
+      appId: appId.trim() || '1:123456789:web:abcdef',
+      databaseId: customDbId.trim() || '(default)',
+    };
+
+    saveStoredFirebaseConfig(newConfig);
+  };
+
+  const handleClearCredentials = () => {
+    const ok = window.confirm('¿Deseas desvincular estas credenciales de Firebase de este navegador?');
+    if (ok) {
+      clearStoredFirebaseConfig();
+    }
   };
 
   const handleClearData = () => {
@@ -234,6 +306,188 @@ VITE_FIREBASE_FIRESTORE_DATABASE_ID="(default)"`;
               <span>Memoria local vaciada. El sistema mostrará únicamente los registros existentes en Firestore.</span>
             </div>
           )}
+
+          {/* Direct Credentials Configuration Box */}
+          <div className="p-4 rounded-xl bg-white border-2 border-blue-200 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-blue-600" />
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wide">
+                  Configuración Directa de Firebase (Sin Terminal)
+                </h3>
+                {isFirebaseConfigured ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Conectado
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Pendiente
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigForm(!showConfigForm)}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+              >
+                {showConfigForm ? 'Ocultar campos' : 'Ingresar / Modificar credenciales'}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Pega aquí la configuración de tu proyecto en Firebase Console para conectar tu Firestore al instante en esta aplicación.
+            </p>
+
+            {/* Vercel Redeploy Notice */}
+            <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300 text-amber-950 text-xs space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>¿Agregaste las variables en Vercel pero sigue saliendo que no están presentes?</span>
+              </div>
+              <p className="text-[11px] text-amber-900 leading-relaxed">
+                <strong>En Vercel es obligatorio hacer un Redeploy</strong>: En Vite y React, las variables de entorno se inyectan únicamente durante la compilación. Si solo guardaste las variables, tu sitio web sigue mostrando la versión compilada anterior.
+              </p>
+              <div className="pt-0.5 text-[11px] text-slate-800">
+                <strong>Cómo solucionarlo en Vercel:</strong> Ve a tu proyecto en Vercel ➔ Pestaña <strong>Deployments</strong> ➔ Clic en los <strong>tres puntos (...)</strong> del despliegue más reciente ➔ Clic en <strong>Redeploy</strong>.
+              </div>
+            </div>
+
+            {/* Variables detection status */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+              <div>
+                <span className="text-slate-500">API Key:</span>{' '}
+                <strong className={envStatus.apiKey ? 'text-emerald-700' : 'text-rose-600'}>
+                  {envStatus.apiKey ? 'Detectada ✅' : 'Falta ❌'}
+                </strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Project ID:</span>{' '}
+                <strong className={envStatus.projectId ? 'text-emerald-700' : 'text-rose-600'}>
+                  {envStatus.projectId ? 'Detectado ✅' : 'Falta ❌'}
+                </strong>
+              </div>
+              <div>
+                <span className="text-slate-500">Firestore DB:</span>{' '}
+                <strong className="text-slate-700 font-mono">
+                  {databaseId}
+                </strong>
+              </div>
+            </div>
+
+            {showConfigForm && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 animate-fade-in">
+                {/* Auto-parser box */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>1. Pega tu bloque de configuración de Firebase Console (Autocompletado):</span>
+                    <a
+                      href="https://console.firebase.google.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:underline flex items-center gap-1 font-normal text-[10px]"
+                    >
+                      Abrir Firebase Console <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={rawSnippet}
+                    onChange={(e) => handleSnippetPaste(e.target.value)}
+                    placeholder="Pega aquí: const firebaseConfig = { apiKey: 'AIzaSy...', projectId: '...', appId: '...' };"
+                    className="w-full text-xs font-mono p-2.5 border border-slate-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50 placeholder:text-slate-400"
+                  />
+                  <span className="text-[10px] text-slate-400">
+                    Al pegar el código de Firebase, los campos de abajo se rellenan automáticamente.
+                  </span>
+                </div>
+
+                {/* Individual inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                      API Key <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full text-xs font-mono p-2 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                      Project ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customProjectId}
+                      onChange={(e) => setCustomProjectId(e.target.value)}
+                      placeholder="tu-proyecto-id"
+                      className="w-full text-xs font-mono p-2 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                      App ID
+                    </label>
+                    <input
+                      type="text"
+                      value={appId}
+                      onChange={(e) => setAppId(e.target.value)}
+                      placeholder="1:123456789:web:abcdef"
+                      className="w-full text-xs font-mono p-2 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                      Base de Datos (Firestore Database ID)
+                    </label>
+                    <input
+                      type="text"
+                      value={customDbId}
+                      onChange={(e) => setCustomDbId(e.target.value)}
+                      placeholder="(default)"
+                      className="w-full text-xs font-mono p-2 border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Save Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveCredentials}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-98"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Guardar y Conectar a Firebase</span>
+                    </button>
+
+                    {storedConfig && (
+                      <button
+                        type="button"
+                        onClick={handleClearCredentials}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-semibold transition-colors border border-slate-200 cursor-pointer"
+                        title="Borrar credenciales guardadas"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Desvincular</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <span className="text-[10px] text-slate-500">
+                    Se guarda directamente en tu navegador.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Real-time Diagnostics & Test Section */}
           <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200/90 space-y-3">

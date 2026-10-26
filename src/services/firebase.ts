@@ -43,22 +43,89 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Check configuration
+export interface FirebaseCredentials {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  databaseId?: string;
+}
+
+export function getStoredFirebaseConfig(): FirebaseCredentials | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('sicurezza_firebase_custom_config');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.apiKey && parsed.projectId) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading saved firebase config', e);
+  }
+  return null;
+}
+
+export function saveStoredFirebaseConfig(config: FirebaseCredentials) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('sicurezza_firebase_custom_config', JSON.stringify(config));
+  window.location.reload();
+}
+
+export function clearStoredFirebaseConfig() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('sicurezza_firebase_custom_config');
+  window.location.reload();
+}
+
+function cleanEnv(val: string | undefined): string {
+  if (!val) return '';
+  return val.trim().replace(/^["']|["']$/g, '').trim();
+}
+
+// Check configuration: priority to env (VITE_ or FIREBASE_), then localStorage
+const storedConfig = getStoredFirebaseConfig();
+
+const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY || (import.meta.env as any).FIREBASE_API_KEY;
+const envAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || (import.meta.env as any).FIREBASE_AUTH_DOMAIN;
+const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || (import.meta.env as any).FIREBASE_PROJECT_ID;
+const envStorageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || (import.meta.env as any).FIREBASE_STORAGE_BUCKET;
+const envSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || (import.meta.env as any).FIREBASE_MESSAGING_SENDER_ID;
+const envAppId = import.meta.env.VITE_FIREBASE_APP_ID || (import.meta.env as any).FIREBASE_APP_ID;
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: cleanEnv(envApiKey) || cleanEnv(storedConfig?.apiKey),
+  authDomain: cleanEnv(envAuthDomain) || cleanEnv(storedConfig?.authDomain),
+  projectId: cleanEnv(envProjectId) || cleanEnv(storedConfig?.projectId),
+  storageBucket: cleanEnv(envStorageBucket) || cleanEnv(storedConfig?.storageBucket),
+  messagingSenderId: cleanEnv(envSenderId) || cleanEnv(storedConfig?.messagingSenderId),
+  appId: cleanEnv(envAppId) || cleanEnv(storedConfig?.appId),
 };
 
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
   firebaseConfig.apiKey !== 'AIzaSy...' &&
+  firebaseConfig.apiKey !== 'AIzaSy' &&
   firebaseConfig.projectId &&
-  firebaseConfig.projectId !== 'tu-proyecto-id'
+  firebaseConfig.projectId !== 'tu-proyecto-id' &&
+  firebaseConfig.projectId !== 'tu-proyecto'
 );
+
+export function getFirebaseEnvStatus() {
+  return {
+    apiKey: Boolean(firebaseConfig.apiKey),
+    projectId: Boolean(firebaseConfig.projectId),
+    authDomain: Boolean(firebaseConfig.authDomain),
+    appId: Boolean(firebaseConfig.appId),
+    storageBucket: Boolean(firebaseConfig.storageBucket),
+    messagingSenderId: Boolean(firebaseConfig.messagingSenderId),
+    currentProjectId: firebaseConfig.projectId || 'No detectado',
+    isConfigured: isFirebaseConfigured,
+  };
+}
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
@@ -67,13 +134,16 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Determine valid databaseId
 function resolveDatabaseId(): string {
-  const rawDbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+  const envDbId =
+    import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID ||
+    (import.meta.env as any).FIREBASE_FIRESTORE_DATABASE_ID ||
+    (import.meta.env as any).FIREBASE_DATABASE_ID;
+  const rawDbId = cleanEnv(envDbId) || storedConfig?.databaseId;
   if (!rawDbId || rawDbId === 'tu-database-id' || rawDbId === '(default)') {
     return '(default)';
   }
-  // Check if someone accidentally provided an App ID pattern (e.g., 1:835108...:web:...)
   if (/^1:\d+:web:[a-f0-9]+$/i.test(rawDbId)) {
-    console.warn(`[Firebase] VITE_FIREBASE_FIRESTORE_DATABASE_ID contiene un formato de App ID (${rawDbId}). Usando '(default)'.`);
+    console.warn(`[Firebase] Database ID contiene formato de App ID (${rawDbId}). Usando '(default)'.`);
     return '(default)';
   }
   return rawDbId;

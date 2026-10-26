@@ -10,8 +10,6 @@ import {
   ShieldCheck,
   FileQuestion,
   Layers,
-  Github,
-  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -22,7 +20,6 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   totalCasesCount: number;
   onOpenFieldConfigurator: () => void;
-  onOpenDownloadModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,7 +27,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   totalCasesCount,
   onOpenFieldConfigurator,
-  onOpenDownloadModal,
 }) => {
   const { user } = useAuth();
 
@@ -135,17 +131,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Info Card */}
       <div className="pt-4 mt-4 border-t border-slate-800 space-y-2">
-        {onOpenDownloadModal && (
-          <button
-            type="button"
-            onClick={onOpenDownloadModal}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98"
-          >
-            <Github className="w-3.5 h-3.5 text-blue-400" />
-            <span>Descargar & GitHub</span>
-          </button>
-        )}
-
         <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-800 text-xs">
           <div className="flex items-center gap-2 mb-1 text-cyan-400">
             <ShieldCheck className="w-3.5 h-3.5" />

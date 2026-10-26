@@ -11,7 +11,6 @@ import { HistoricalMigrationView } from './components/migration/HistoricalMigrat
 import { FieldConfiguratorView } from './components/admin/FieldConfiguratorView';
 import { FieldConfiguratorModal } from './components/admin/FieldConfiguratorModal';
 import { FirebaseConfigModal } from './components/admin/FirebaseConfigModal';
-import { DownloadGithubModal } from './components/admin/DownloadGithubModal';
 import { CaseDetailModal } from './components/cases/CaseDetailModal';
 import { CaseEditModal } from './components/cases/CaseEditModal';
 import { CaseFilterState, CaseItem } from './types/case';
@@ -39,7 +38,6 @@ function MainApp() {
   // Modals
   const [isFieldConfigOpen, setIsFieldConfigOpen] = useState(false);
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
-  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [selectedCaseForDetail, setSelectedCaseForDetail] = useState<CaseItem | null>(null);
   const [selectedCaseForEdit, setSelectedCaseForEdit] = useState<CaseItem | null>(null);
 
@@ -143,7 +141,6 @@ function MainApp() {
       <Navbar
         onOpenFirebaseModal={() => setIsFirebaseModalOpen(true)}
         onOpenFieldConfigurator={() => setIsFieldConfigOpen(true)}
-        onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
       />
 
       <div className="flex-1 flex flex-col lg:flex-row w-full">
@@ -153,7 +150,6 @@ function MainApp() {
           onSelectTab={setCurrentTab}
           totalCasesCount={allCases.filter((c) => !c.isArchived).length}
           onOpenFieldConfigurator={() => setIsFieldConfigOpen(true)}
-          onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
         />
 
         {/* Main Content Area */}
@@ -253,13 +249,6 @@ function MainApp() {
         <FirebaseConfigModal
           isOpen={isFirebaseModalOpen}
           onClose={() => setIsFirebaseModalOpen(false)}
-        />
-      )}
-
-      {isDownloadModalOpen && (
-        <DownloadGithubModal
-          isOpen={isDownloadModalOpen}
-          onClose={() => setIsDownloadModalOpen(false)}
         />
       )}
 

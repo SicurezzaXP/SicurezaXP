@@ -8,21 +8,17 @@ import {
   Sparkles,
   HelpCircle,
   Database,
-  Download,
-  Github,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 interface NavbarProps {
   onOpenFirebaseModal: () => void;
   onOpenFieldConfigurator: () => void;
-  onOpenDownloadModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenFirebaseModal,
   onOpenFieldConfigurator,
-  onOpenDownloadModal,
 }) => {
   const { user, isFirebaseActive } = useAuth();
   const [peruTime, setPeruTime] = useState<string>('');
@@ -107,19 +103,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Sliders className="w-3.5 h-3.5 text-blue-600" />
             <span className="hidden sm:inline">Configurar Campos</span>
           </button>
-
-          {/* Descargar Proyecto / GitHub button */}
-          {onOpenDownloadModal && (
-            <button
-              type="button"
-              onClick={onOpenDownloadModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-              title="Descargar código fuente en ZIP y subir a GitHub"
-            >
-              <Github className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden sm:inline">Descargar & GitHub</span>
-            </button>
-          )}
 
           {/* Single User Avatar (Administrador SICUREZZA XP) */}
           <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">

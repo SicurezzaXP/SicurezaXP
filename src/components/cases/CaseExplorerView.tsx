@@ -31,6 +31,8 @@ import {
   MOTIVOS,
   ESTADOS_CASO,
   CIERRES_CASO,
+  getMasterOptions,
+  MASTER_OPTIONS_UPDATED_EVENT,
 } from '../../config/formFields';
 
 interface CaseExplorerViewProps {
@@ -52,6 +54,15 @@ export const CaseExplorerView: React.FC<CaseExplorerViewProps> = ({ cases, onExp
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCierre, setSelectedCierre] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [masterOptions, setMasterOptions] = useState(() => getMasterOptions());
+
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) setMasterOptions(e.detail);
+    };
+    window.addEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+  }, []);
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>('fechaIngreso');
@@ -305,7 +316,7 @@ export const CaseExplorerView: React.FC<CaseExplorerViewProps> = ({ cases, onExp
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todas las sedes</option>
-              {ORIGENES_VENTA.map((s) => (
+              {masterOptions.tiendas.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

@@ -1,12 +1,15 @@
 import { FormFieldConfig } from '../types/case';
 
 /**
- * SICUREZZA XP — Configuración Oficial de Preguntas y Campos
- * Extraído 1:1 de Google Forms "Registro de casos ATC"
+ * SICUREZZA XP — Configuración Oficial de Preguntas, Variables y Listas
+ * Extraído 1:1 de Google Forms "Registro de casos ATC" con soporte dinámico para personalización
  */
 
-export const FORM_FIELDS_STORAGE_KEY = 'sicurezza_xp_fields_v4';
+export const FORM_FIELDS_STORAGE_KEY = 'sicurezza_xp_fields_v5';
 export const FORM_FIELDS_UPDATED_EVENT = 'sicurezza_xp_fields_updated';
+
+export const MASTER_OPTIONS_STORAGE_KEY = 'sicurezza_xp_master_options_v2';
+export const MASTER_OPTIONS_UPDATED_EVENT = 'sicurezza_xp_options_updated';
 
 // Secciones del formulario oficial
 export const FORM_SECTIONS = [
@@ -17,60 +20,156 @@ export const FORM_SECTIONS = [
   'Finalización del caso',
 ] as const;
 
-// Listas maestras según formulario original
-export const CANALES_ATENCION = [
-  'WhatsApp',
-  'Instagram',
-  'info@sicurezza.pe',
-  'TikTok',
-  'Libro de Reclamaciones',
-];
+export interface MasterOptionsConfig {
+  tiendas: string[];
+  canales: string[];
+  consultaMotivos: string[];
+  motivos: string[];
+  submotivos: string[];
+  tiposPago: string[];
+  tallas: string[];
+  colores: string[];
+  soluciones: string[];
+  sucursalesQueja: string[];
+}
 
-export const ORIGENES_VENTA = [
-  'Tda. Jockey Plaza',
-  'Tda. El Polo',
-  'Tda. Pza Norte',
-  'Tda. Mall Ave. Trujillo',
-  'Tda. Salaverry',
-  'Tda. Mall Pza. Arequipa',
-  'Tda. San Miguel',
-  'Tda. Angamos',
-  'Tda. Ica',
-  'Tda. Piura',
-  'Sicurezza.pe',
-];
+export const DEFAULT_MASTER_OPTIONS: MasterOptionsConfig = {
+  tiendas: [
+    'Canales Digitales / Web',
+    'Tda. Jockey Plaza',
+    'Tda. El Polo',
+    'Tda. Pza Norte',
+    'Tda. Mall Ave. Trujillo',
+    'Tda. Salaverry',
+    'Tda. Mall Pza. Arequipa',
+    'Tda. San Miguel',
+    'Tda. Angamos',
+    'Tda. Ica',
+    'Tda. Piura',
+    'Sicurezza.pe',
+  ],
+  canales: [
+    'WhatsApp',
+    'Instagram',
+    'info@sicurezza.pe',
+    'TikTok',
+    'Presencial Tienda',
+    'Libro de Reclamaciones',
+  ],
+  consultaMotivos: [
+    'Stock y Disponibilidad de Producto',
+    'Guía de Tallas y Asesoría de Medidas',
+    'Ubicación y Horarios de Tiendas Físicas',
+    'Tiempos y Costos de Envío / Courier',
+    'Promociones, Descuentos y Cupones',
+    'Consulta de Pedido Existente',
+    'Otra Consulta General',
+  ],
+  motivos: [
+    'Producto',
+    'Pedido',
+    'Calidad',
+    'Publicidad o promoción',
+    'Atención al cliente',
+    'No le gusta/No le queda',
+    'Error de bot',
+  ],
+  submotivos: [
+    'Producto - Características erradas',
+    'Producto - Daño mal uso',
+    'Producto - Stock de producto',
+    'Pedido - Entrega incompleta',
+    'Pedido - Pendiente de entrega',
+    'Pedido - Estado de pedido',
+    'Pedido - Desconocimiento de entrega',
+    'Pedido - Dirección de entrega',
+    'Pedido - Pzos. de entrega',
+    'Pedido - Parcialmente entregado',
+    'Pedido - Error de pago',
+    'Calidad - Falla de fábrica',
+    'Calidad - Mal olor',
+    'Calidad - Heridas/Alergia',
+    'Calidad - Material',
+    'Calidad - Problemas guía de tallas.',
+    'Promoción y publicidad - Precio errado',
+    'Promoción y publicidad - Promoción incumplida',
+    'Promoción y publicidad - Publicidad engañosa',
+    'ATC - Mala atención',
+    'ATC - Tiempo de espera',
+    'ATC - Tiempo de resolución',
+    'Cambio - Talla Color Modelo',
+    'Devolución - Extorno',
+    'Nota de crédito',
+  ],
+  tiposPago: [
+    'Yape',
+    'Efectivo',
+    'Tarjeta',
+    'Agente',
+    'Plin / Transferencia',
+  ],
+  tallas: [
+    'XS',
+    'S',
+    'M',
+    'L',
+    'XL',
+    '2XL',
+    'N/A',
+  ],
+  colores: [
+    'Negro',
+    'Blanco',
+    'Beige',
+    'Dark beige',
+    'Rosado',
+    'Gris',
+    'Gris claro',
+    'Azul',
+    'Terracota',
+    'Café',
+    'Invisible',
+    'N/A',
+  ],
+  sucursalesQueja: [
+    'WhatsApp',
+    'Instagram',
+    'Tda. Jockey Plaza',
+    'Tda. El Polo',
+    'Tda. Pza. Norte',
+    'Tda. Salaverry',
+    'Tda. San Miguel',
+    'Tda. Mall Arequipa',
+    'Tda. Trujillo',
+    'Tda. Angamos',
+    'Courier',
+    'N/A',
+  ],
+  soluciones: [
+    'Cambio - Talla',
+    'Cambio - Color',
+    'Cambio - Modelo',
+    'Cambio prenda',
+    'Devolución - Medio de pago tarjeta',
+    'Devolución - Efectivo transferencia',
+    'Devolución - Yape transferencia',
+    'Nota de crédito',
+    'Entrega de pedido',
+    'Entrega de información',
+    'Otro',
+  ],
+};
 
-export const TIPOS_PAGO = [
-  'Yape',
-  'Efectivo',
-  'Tarjeta',
-  'Agente',
-];
-
-export const TALLAS = [
-  'XS',
-  'S',
-  'M',
-  'L',
-  'XL',
-  '2XL',
-  'N/A',
-];
-
-export const COLORES = [
-  'Negro',
-  'Blanco',
-  'Beige',
-  'Dark beige',
-  'Rosado',
-  'Gris',
-  'Gris claro',
-  'Azul',
-  'Terracota',
-  'Café',
-  'Invisible',
-  'N/A',
-];
+// Aliases para compatibilidad con código existente
+export const CANALES_ATENCION = DEFAULT_MASTER_OPTIONS.canales;
+export const ORIGENES_VENTA = DEFAULT_MASTER_OPTIONS.tiendas;
+export const TIPOS_PAGO = DEFAULT_MASTER_OPTIONS.tiposPago;
+export const TALLAS = DEFAULT_MASTER_OPTIONS.tallas;
+export const COLORES = DEFAULT_MASTER_OPTIONS.colores;
+export const MOTIVOS = DEFAULT_MASTER_OPTIONS.motivos;
+export const SUBMOTIVOS = DEFAULT_MASTER_OPTIONS.submotivos;
+export const SUCURSALES_QUEJA = DEFAULT_MASTER_OPTIONS.sucursalesQueja;
+export const SOLUCIONES_BRINDADAS = DEFAULT_MASTER_OPTIONS.soluciones;
 
 export const TIPOS_CASO = [
   'Solicitud',
@@ -80,85 +179,137 @@ export const TIPOS_CASO = [
   'Libro de Reclamaciones',
 ];
 
-export const MOTIVOS = [
-  'Producto',
-  'Pedido',
-  'Calidad',
-  'Publicidad o promoción',
-  'Atención al cliente',
-  'No le gusta/No le queda',
-  'Error de bot',
-];
-
-export const SUBMOTIVOS = [
-  'Producto - Características erradas',
-  'Producto - Daño mal uso',
-  'Producto - Stock de producto',
-  'Pedido - Entrega incompleta',
-  'Pedido - Pendiente de entrega',
-  'Pedido - Estado de pedido',
-  'Pedido - Desconocimiento de entrega',
-  'Pedido - Dirección de entrega',
-  'Pedido - Pzos. de entrega',
-  'Pedido - Parcialmente entregado',
-  'Pedido - Error de pago',
-  'Calidad - Falla de fábrica',
-  'Calidad - Mal olor',
-  'Calidad - Heridas/Alergia',
-  'Calidad - Material',
-  'Calidad - Problemas guía de tallas.',
-  'Promoción y publicidad - Precio errado',
-  'Promoción y publicidad - Promoción incumplida',
-  'Promoción y publicidad - Publicidad engañosa',
-  'ATC - Mala atención',
-  'ATC - Tiempo de espera',
-  'ATC - Tiempo de resolución',
-  'Cambio - Talla Color Modelo',
-  'Devolución - Extorno',
-  'Nota de crédito',
-];
-
-export const SUCURSALES_QUEJA = [
-  'WhatsApp',
-  'Instagram',
-  'Tda. Jockey Plaza',
-  'Tda. El Polo',
-  'Tda. Pza. Norte',
-  'Tda. Salaverry',
-  'Tda. San Miguel',
-  'Tda. Mall Aerquipa',
-  'Tda. Trujillo',
-  'Tda. Angamos',
-  'Courier',
-  'N/A',
-];
-
-export const SOLUCIONES_BRINDADAS = [
-  'Cambio - Talla',
-  'Cambio - Color',
-  'Cambio - Modelo',
-  'Cambio prenda',
-  'Devolución - Medio de pago tarjeta',
-  'Devolución - Efectivo transferencia',
-  'Devolución - Yape transferencia',
-  'Nota de crédito',
-  'Entrega de pedido',
-  'Entrega de información',
-  'Otro',
-];
-
 export const ESTADOS_CASO = ['Abierto', 'Cerrado'];
 export const CIERRES_CASO = ['Procede', 'No procede', 'Pendiente'];
 export const FCR_OPCIONES = ['Sí', 'No'];
 export const PRIORIDADES = ['Baja', 'Media', 'Alta', 'Urgente'];
 
-// Alias retrocompatibles para filtros y tablas existentes
 export const STORES_LIST = ORIGENES_VENTA;
 export const CHANNELS_LIST = CANALES_ATENCION;
 export const CATEGORIES_LIST = MOTIVOS;
 export const SUBCATEGORIES_LIST = SUBMOTIVOS;
 export const STATUS_LIST = ESTADOS_CASO;
 export const PRIORITY_LIST = PRIORIDADES;
+
+/**
+ * Obtener opciones maestras guardadas (tiendas, canales, motivos de consulta, etc.)
+ */
+export function getMasterOptions(): MasterOptionsConfig {
+  if (typeof window === 'undefined') return DEFAULT_MASTER_OPTIONS;
+  try {
+    const raw = localStorage.getItem(MASTER_OPTIONS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(MASTER_OPTIONS_STORAGE_KEY, JSON.stringify(DEFAULT_MASTER_OPTIONS));
+      return DEFAULT_MASTER_OPTIONS;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      tiendas: Array.isArray(parsed.tiendas) && parsed.tiendas.length > 0 ? parsed.tiendas : DEFAULT_MASTER_OPTIONS.tiendas,
+      canales: Array.isArray(parsed.canales) && parsed.canales.length > 0 ? parsed.canales : DEFAULT_MASTER_OPTIONS.canales,
+      consultaMotivos: Array.isArray(parsed.consultaMotivos) && parsed.consultaMotivos.length > 0 ? parsed.consultaMotivos : DEFAULT_MASTER_OPTIONS.consultaMotivos,
+      motivos: Array.isArray(parsed.motivos) && parsed.motivos.length > 0 ? parsed.motivos : DEFAULT_MASTER_OPTIONS.motivos,
+      submotivos: Array.isArray(parsed.submotivos) && parsed.submotivos.length > 0 ? parsed.submotivos : DEFAULT_MASTER_OPTIONS.submotivos,
+      tiposPago: Array.isArray(parsed.tiposPago) && parsed.tiposPago.length > 0 ? parsed.tiposPago : DEFAULT_MASTER_OPTIONS.tiposPago,
+      tallas: Array.isArray(parsed.tallas) && parsed.tallas.length > 0 ? parsed.tallas : DEFAULT_MASTER_OPTIONS.tallas,
+      colores: Array.isArray(parsed.colores) && parsed.colores.length > 0 ? parsed.colores : DEFAULT_MASTER_OPTIONS.colores,
+      soluciones: Array.isArray(parsed.soluciones) && parsed.soluciones.length > 0 ? parsed.soluciones : DEFAULT_MASTER_OPTIONS.soluciones,
+      sucursalesQueja: Array.isArray(parsed.sucursalesQueja) && parsed.sucursalesQueja.length > 0 ? parsed.sucursalesQueja : DEFAULT_MASTER_OPTIONS.sucursalesQueja,
+    };
+  } catch (e) {
+    console.error('Error al leer master options:', e);
+    return DEFAULT_MASTER_OPTIONS;
+  }
+}
+
+/**
+ * Guardar opciones maestras actualizadas y sincronizar campos dependientes
+ */
+export function saveMasterOptions(opts: MasterOptionsConfig): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MASTER_OPTIONS_STORAGE_KEY, JSON.stringify(opts));
+    
+    // Sincronizar en campos del formulario si están guardados
+    const currentFields = getStoredFormFields();
+    let fieldsChanged = false;
+
+    const updatedFields = currentFields.map((f) => {
+      if (f.id === 'origenVenta') {
+        fieldsChanged = true;
+        return { ...f, options: opts.tiendas };
+      }
+      if (f.id === 'canal') {
+        fieldsChanged = true;
+        return { ...f, options: opts.canales };
+      }
+      if (f.id === 'motivo') {
+        fieldsChanged = true;
+        return { ...f, options: opts.motivos };
+      }
+      if (f.id === 'submotivo') {
+        fieldsChanged = true;
+        return { ...f, options: opts.submotivos };
+      }
+      if (f.id === 'tipoPago') {
+        fieldsChanged = true;
+        return { ...f, options: opts.tiposPago };
+      }
+      if (f.id === 'talla') {
+        fieldsChanged = true;
+        return { ...f, options: opts.tallas };
+      }
+      if (f.id === 'color') {
+        fieldsChanged = true;
+        return { ...f, options: opts.colores };
+      }
+      if (f.id === 'solucionBrindada') {
+        fieldsChanged = true;
+        return { ...f, options: opts.soluciones };
+      }
+      if (f.id === 'sucursalQueja') {
+        fieldsChanged = true;
+        return { ...f, options: opts.sucursalesQueja };
+      }
+      return f;
+    });
+
+    if (fieldsChanged) {
+      saveStoredFormFields(updatedFields);
+    }
+
+    window.dispatchEvent(new CustomEvent(MASTER_OPTIONS_UPDATED_EVENT, { detail: opts }));
+  } catch (e) {
+    console.error('Error al guardar master options:', e);
+  }
+}
+
+/**
+ * Actualizar una lista específica de opciones (ej: tiendas, motivos, canales)
+ */
+export function updateMasterOptionList(listKey: keyof MasterOptionsConfig, items: string[]): void {
+  const current = getMasterOptions();
+  const cleaned = Array.from(new Set(items.map((i) => i.trim()).filter(Boolean)));
+  const updated: MasterOptionsConfig = {
+    ...current,
+    [listKey]: cleaned,
+  };
+  saveMasterOptions(updated);
+}
+
+/**
+ * Restablecer todas las opciones maestras a los valores iniciales oficiales
+ */
+export function resetMasterOptions(): MasterOptionsConfig {
+  if (typeof window === 'undefined') return DEFAULT_MASTER_OPTIONS;
+  try {
+    localStorage.setItem(MASTER_OPTIONS_STORAGE_KEY, JSON.stringify(DEFAULT_MASTER_OPTIONS));
+    window.dispatchEvent(new CustomEvent(MASTER_OPTIONS_UPDATED_EVENT, { detail: DEFAULT_MASTER_OPTIONS }));
+    return DEFAULT_MASTER_OPTIONS;
+  } catch (e) {
+    console.error('Error al restablecer master options:', e);
+    return DEFAULT_MASTER_OPTIONS;
+  }
+}
 
 export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
   // 1. Registro datos cliente
@@ -191,7 +342,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '4. Canal de atención',
     type: 'select',
     required: true,
-    options: CANALES_ATENCION,
+    options: DEFAULT_MASTER_OPTIONS.canales,
   },
   {
     id: 'telefonoCliente',
@@ -241,7 +392,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '10. Origen de venta',
     type: 'select',
     required: true,
-    options: ORIGENES_VENTA,
+    options: DEFAULT_MASTER_OPTIONS.tiendas,
   },
   {
     id: 'fechaVenta',
@@ -256,7 +407,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '12. Tipo de pago',
     type: 'select',
     required: true,
-    options: TIPOS_PAGO,
+    options: DEFAULT_MASTER_OPTIONS.tiposPago,
   },
   {
     id: 'producto',
@@ -288,7 +439,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '16. Talla',
     type: 'select',
     required: true,
-    options: TALLAS,
+    options: DEFAULT_MASTER_OPTIONS.tallas,
   },
   {
     id: 'color',
@@ -296,7 +447,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '17. Color',
     type: 'select',
     required: true,
-    options: COLORES,
+    options: DEFAULT_MASTER_OPTIONS.colores,
   },
 
   // 3. Registro Caso
@@ -314,7 +465,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '19. Motivo',
     type: 'select',
     required: true,
-    options: MOTIVOS,
+    options: DEFAULT_MASTER_OPTIONS.motivos,
   },
   {
     id: 'submotivo',
@@ -322,7 +473,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '20. Sub motivo',
     type: 'select',
     required: false,
-    options: SUBMOTIVOS,
+    options: DEFAULT_MASTER_OPTIONS.submotivos,
   },
   {
     id: 'fechaDerivacion',
@@ -356,7 +507,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '24. Sucursal de queja',
     type: 'select',
     required: true,
-    options: SUCURSALES_QUEJA,
+    options: DEFAULT_MASTER_OPTIONS.sucursalesQueja,
   },
   {
     id: 'fechaAtencion',
@@ -381,7 +532,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
     label: '27. Solución brindada',
     type: 'select',
     required: true,
-    options: SOLUCIONES_BRINDADAS,
+    options: DEFAULT_MASTER_OPTIONS.soluciones,
   },
   {
     id: 'cerroEnFcr',
@@ -441,7 +592,7 @@ export const DEFAULT_FORM_FIELDS: FormFieldConfig[] = [
 
 export const FORM_SYNC_STATUS = {
   isConfirmed: true,
-  documentSource: 'Formulario oficial de Google Forms revisado 100% y cargado',
+  documentSource: 'Formulario oficial de Google Forms sincronizado con Sicurezza XP',
 };
 
 /**

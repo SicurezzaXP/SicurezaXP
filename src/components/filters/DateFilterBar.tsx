@@ -13,12 +13,11 @@ import {
 import { CaseFilterState, QuickDatePreset } from '../../types/case';
 import { calculateDatePresetRange } from '../../utils/dateUtils';
 import {
-  ORIGENES_VENTA,
-  CANALES_ATENCION,
   TIPOS_CASO,
-  MOTIVOS,
   ESTADOS_CASO,
   CIERRES_CASO,
+  getMasterOptions,
+  MASTER_OPTIONS_UPDATED_EVENT,
 } from '../../config/formFields';
 
 interface DateFilterBarProps {
@@ -37,6 +36,15 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
   totalAllCount,
 }) => {
   const [timeViewMode, setTimeViewMode] = useState<'dia' | 'mes'>('dia');
+  const [masterOptions, setMasterOptions] = useState(() => getMasterOptions());
+
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) setMasterOptions(e.detail);
+    };
+    window.addEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+  }, []);
 
   const handlePresetSelect = (preset: QuickDatePreset) => {
     const range = calculateDatePresetRange(preset);
@@ -221,7 +229,7 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos los canales</option>
-            {CANALES_ATENCION.map((c) => (
+            {masterOptions.canales.map((c: string) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -240,7 +248,7 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todas las sedes</option>
-            {ORIGENES_VENTA.map((s) => (
+            {masterOptions.tiendas.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -259,7 +267,7 @@ export const DateFilterBar: React.FC<DateFilterBarProps> = ({
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos los motivos</option>
-            {MOTIVOS.map((m) => (
+            {masterOptions.motivos.map((m) => (
               <option key={m} value={m}>
                 {m}
               </option>

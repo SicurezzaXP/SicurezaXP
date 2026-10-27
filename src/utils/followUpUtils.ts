@@ -57,9 +57,8 @@ export function getCaseFollowUpInfo(item: CaseItem): FollowUpInfo {
   // 1. requiereSeguimiento está explícitamente en true, O
   // 2. El caso está Abierto y no es una consulta simple resuelta en FCR
   const isCandidate =
-    item.requiereSeguimiento === true ||
-    (item.estado === 'Abierto' && item.tipoCaso !== 'Consulta') ||
-    (item.tipoCaso === 'Consulta' && item.requiereSeguimiento === true);
+    Boolean(item.requiereSeguimiento) ||
+    (item.estado === 'Abierto' && item.tipoCaso !== 'Consulta');
 
   if (!isCandidate) {
     return { isNeeded: false, dueDate: '', urgency: 'ninguno', daysDiff: 0, label: 'Sin seguimiento' };

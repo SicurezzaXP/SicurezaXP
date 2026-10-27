@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { X, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, Save, AlertTriangle, CheckCircle2, Bell } from 'lucide-react';
 import { CaseItem } from '../../types/case';
 import { updateCase } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
+import { addDaysToDate } from '../../utils/followUpUtils';
+import { getPeruDateString } from '../../utils/dateUtils';
 import {
   ESTADOS_CASO,
   CIERRES_CASO,
@@ -11,6 +13,8 @@ import {
   ORIGENES_VENTA,
   TIPOS_CASO,
   MOTIVOS,
+  getMasterOptions,
+  MASTER_OPTIONS_UPDATED_EVENT,
 } from '../../config/formFields';
 
 interface CaseEditModalProps {
@@ -25,6 +29,17 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
   onUpdated,
 }) => {
   const { user } = useAuth();
+  const today = getPeruDateString();
+
+  const [masterOptions, setMasterOptions] = useState(() => getMasterOptions());
+
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) setMasterOptions(e.detail);
+    };
+    window.addEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+  }, []);
 
   // Form states
   const [estado, setEstado] = useState<string>(caseItem?.estado || 'Abierto');
@@ -47,6 +62,17 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
   );
   const [solicitudCliente, setSolicitudCliente] = useState(
     caseItem?.solicitudCliente || caseItem?.descripcion || ''
+  );
+
+  // Follow-up alert fields
+  const [requiereSeguimiento, setRequiereSeguimiento] = useState<boolean>(
+    caseItem?.requiereSeguimiento ?? (caseItem?.estado !== 'Cerrado')
+  );
+  const [fechaProximoSeguimiento, setFechaProximoSeguimiento] = useState<string>(
+    caseItem?.fechaProximoSeguimiento || addDaysToDate(caseItem?.fechaIngreso || today, 2)
+  );
+  const [frecuenciaSeguimientoDias, setFrecuenciaSeguimientoDias] = useState<number>(
+    caseItem?.frecuenciaSeguimientoDias || 2
   );
 
   const [isSaving, setIsSaving] = useState(false);
@@ -84,11 +110,16 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
         solucionBrindada,
         detalleSolucion,
         fechaRespuesta,
-        fechaCierre: estado === 'Cerrado' && !fechaCierre ? new Date().toISOString().split('T')[0] : fechaCierre,
+        fechaCierre: estado === 'Cerrado' && !fechaCierre ? today : fechaCierre,
         tipoCaso,
         motivo,
         origenVenta,
         solicitudCliente,
+        // Alertas y Seguimiento
+        requiereSeguimiento: estado === 'Cerrado' ? false : requiereSeguimiento,
+        fechaProximoSeguimiento: estado === 'Cerrado' ? '' : fechaProximoSeguimiento,
+        frecuenciaSeguimientoDias,
+        seguimientoCumplido: estado === 'Cerrado',
         // Retrocompatibilidad
         solucionAccion: detalleSolucion,
         tienda: origenVenta,
@@ -257,8 +288,67 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
             />
           </div>
 
+          {/* Seguimiento y Alerta Interna */}
+          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-900 text-xs">
+                <Bell className="w-3.5 h-3.5 text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={requiereSeguimiento && estado !== 'Cerrado'}
+                  disabled={estado === 'Cerrado'}
+                  onChange={(e) => setRequiereSeguimiento(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span>Activar Alerta de Seguimiento Interno</span>
+              </label>
+
+              {estado === 'Cerrado' && (
+                <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  Caso Cerrado (Sin alertas)
+                </span>
+              )}
+            </div>
+
+            {requiereSeguimiento && estado !== 'Cerrado' && (
+              <div className="grid grid-cols-2 gap-3 pt-1 border-t border-blue-100 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                    Fecha Próxima Alerta
+                  </label>
+                  <input
+                    type="date"
+                    value={fechaProximoSeguimiento}
+                    onChange={(e) => setFechaProximoSeguimiento(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                    Cadencia de Alerta
+                  </label>
+                  <select
+                    value={frecuenciaSeguimientoDias}
+                    onChange={(e) => {
+                      const d = Number(e.target.value);
+                      setFrecuenciaSeguimientoDias(d);
+                      setFechaProximoSeguimiento(addDaysToDate(today, d));
+                    }}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs"
+                  >
+                    <option value={1}>Cada 1 día (Diario)</option>
+                    <option value={2}>Cada 2 días (Estándar 48h)</option>
+                    <option value={3}>Cada 3 días</option>
+                    <option value={5}>Cada 5 días</option>
+                    <option value={7}>Cada 7 días (Semanal)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sede / Tipo / Motivo */}
-          <div className="border-t border-slate-200 pt-3 grid grid-cols-2 gap-4">
+          <div className="border-t border-slate-200 pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
                 Tipo de Caso
@@ -285,9 +375,26 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
                 onChange={(e) => setMotivo(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
               >
-                {MOTIVOS.map((m) => (
+                {masterOptions.motivos.map((m) => (
                   <option key={m} value={m}>
                     {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Tienda o Sede
+              </label>
+              <select
+                value={origenVenta}
+                onChange={(e) => setOrigenVenta(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+              >
+                {masterOptions.tiendas.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>

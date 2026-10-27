@@ -143,7 +143,6 @@ function MainApp() {
       label: `Seguimientos & Alertas ${followUpsCount > 0 ? `(${followUpsCount})` : ''}`,
       icon: <Bell className="w-3.5 h-3.5" />,
     },
-    { id: 'configurator', label: 'Configurar Formulario', icon: <Sliders className="w-3.5 h-3.5" /> },
     { id: 'reports', label: 'Reportes & Excel', icon: <FileSpreadsheet className="w-3.5 h-3.5" /> },
     { id: 'migration', label: 'Migración Histórica', icon: <Database className="w-3.5 h-3.5" /> },
   ];
@@ -242,11 +241,6 @@ function MainApp() {
             />
           )}
 
-          {currentTab === 'configurator' && (
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-              <FieldConfiguratorView />
-            </div>
-          )}
 
           {currentTab === 'reports' && (
             <ReportsView

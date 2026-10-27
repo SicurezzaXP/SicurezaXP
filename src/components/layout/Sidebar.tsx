@@ -14,14 +14,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type NavTab = 'dashboard' | 'new_case' | 'explorer' | 'followups' | 'configurator' | 'reports' | 'migration';
+export type NavTab = 'dashboard' | 'new_case' | 'explorer' | 'followups' | 'reports' | 'migration';
 
 interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   totalCasesCount: number;
   followUpsCount?: number;
-  onOpenFieldConfigurator: () => void;
+  onOpenFieldConfigurator?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,7 +29,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   totalCasesCount,
   followUpsCount,
-  onOpenFieldConfigurator,
 }) => {
   const { user } = useAuth();
 
@@ -60,12 +59,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Seguimientos & Alertas',
       icon: <Bell className="w-4 h-4" />,
       badge: followUpsCount,
-    },
-    {
-      id: 'configurator',
-      label: 'Configurar Formulario',
-      icon: <Sliders className="w-4 h-4" />,
-      badge: 'Campos',
     },
     {
       id: 'reports',

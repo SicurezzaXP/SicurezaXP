@@ -21,6 +21,8 @@ import {
   ESTADOS_CASO,
   CIERRES_CASO,
   getStoredFormFields,
+  getMasterOptions,
+  MASTER_OPTIONS_UPDATED_EVENT,
 } from '../../config/formFields';
 
 interface ReportsViewProps {
@@ -94,6 +96,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
   const [filterMotive, setFilterMotive] = useState(defaultFilters.motivo || defaultFilters.categoria || '');
   const [filterStatus, setFilterStatus] = useState(defaultFilters.estado || '');
   const [filterCierre, setFilterCierre] = useState(defaultFilters.cierre || '');
+  const [masterOptions, setMasterOptions] = useState(() => getMasterOptions());
+
+  React.useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) setMasterOptions(e.detail);
+    };
+    window.addEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleUpdate);
+  }, []);
 
   // Column selection state
   const [selectedColumns, setSelectedColumns] = useState<Record<string, boolean>>(() => {
@@ -343,7 +354,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800"
             >
               <option value="">Todas las sedes</option>
-              {ORIGENES_VENTA.map((s) => (
+              {masterOptions.tiendas.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

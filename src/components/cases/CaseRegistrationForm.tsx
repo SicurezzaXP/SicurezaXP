@@ -24,6 +24,8 @@ import {
   Bell,
   Check,
   Info,
+  Store,
+  Tag,
 } from 'lucide-react';
 import { addCase } from '../../services/db';
 import { isFirebaseConfigured } from '../../services/firebase';
@@ -34,8 +36,12 @@ import {
   getStoredFormFields,
   FORM_FIELDS_UPDATED_EVENT,
   FORM_SECTIONS,
+  getMasterOptions,
+  MASTER_OPTIONS_UPDATED_EVENT,
+  MasterOptionsConfig,
 } from '../../config/formFields';
 import { CaseItem, FormFieldConfig } from '../../types/case';
+import { FieldConfiguratorModal } from '../admin/FieldConfiguratorModal';
 
 interface CaseRegistrationFormProps {
   onCaseCreated?: (caseId: string) => void;
@@ -55,6 +61,12 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   const [configuredFields, setConfiguredFields] = useState<FormFieldConfig[]>(() =>
     getStoredFormFields()
   );
+
+  // Dynamic Master Options (Tiendas, Canales, Motivos Consulta, etc.)
+  const [masterOptions, setMasterOptions] = useState<MasterOptionsConfig>(() => getMasterOptions());
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [configModalInitialKey, setConfigModalInitialKey] = useState<keyof MasterOptionsConfig>('tiendas');
+  const [configModalTab, setConfigModalTab] = useState<'variables' | 'preguntas'>('variables');
 
   // Form values state
   const [formValues, setFormValues] = useState<Record<string, any>>({});
@@ -78,9 +90,17 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
       setConfiguredFields(updated);
     };
 
+    const handleOptionsUpdated = (e: any) => {
+      if (e.detail) {
+        setMasterOptions(e.detail);
+      }
+    };
+
     window.addEventListener(FORM_FIELDS_UPDATED_EVENT, handleFieldsUpdated);
+    window.addEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleOptionsUpdated);
     return () => {
       window.removeEventListener(FORM_FIELDS_UPDATED_EVENT, handleFieldsUpdated);
+      window.removeEventListener(MASTER_OPTIONS_UPDATED_EVENT, handleOptionsUpdated);
     };
   }, []);
 
@@ -89,17 +109,17 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
     const defaults: Record<string, any> = {
       fechaIngreso: today,
       fechaVenta: today,
-      canal: 'WhatsApp',
-      origenVenta: 'Tda. Jockey Plaza',
-      tipoPago: 'Tarjeta',
-      talla: 'M',
-      color: 'Beige',
+      canal: masterOptions.canales[0] || 'WhatsApp',
+      origenVenta: masterOptions.tiendas[0] || 'Canales Digitales / Web',
+      tipoPago: masterOptions.tiposPago[0] || 'Tarjeta',
+      talla: masterOptions.tallas[0] || 'M',
+      color: masterOptions.colores[0] || 'Beige',
       tipoCaso: 'Solicitud',
-      motivo: 'Producto',
-      submotivo: 'Producto - Características erradas',
+      motivo: masterOptions.motivos[0] || 'Producto',
+      submotivo: masterOptions.submotivos[0] || 'Producto - Características erradas',
       quejaPersonalInvolucrado: 'N/A',
-      sucursalQueja: 'N/A',
-      solucionBrindada: 'Cambio - Talla',
+      sucursalQueja: masterOptions.sucursalesQueja[0] || 'N/A',
+      solucionBrindada: masterOptions.soluciones[0] || 'Cambio - Talla',
       cerroEnFcr: 'Sí',
       estado: 'Abierto',
       cierre: 'Pendiente',
@@ -710,6 +730,73 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
             </div>
           </button>
         </div>
+
+        {/* BARRA DE CONFIGURACIÓN DIRECTA PARA EL TIPO DE CASO */}
+        <div className="mt-3 p-3.5 bg-gradient-to-r from-blue-50/90 via-slate-50 to-white border border-blue-200 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#161c36] text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <Sliders className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-900">
+                  Configurar Opciones y Preguntas de {formValues.tipoCaso || 'Consulta'}
+                </span>
+                <span className="text-[10px] px-2 py-0.2 rounded-full font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                  {isConsultaMode ? 'Modo Consulta' : 'Caso Operativo'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {isConsultaMode
+                  ? 'Elimina o añade tiendas/sedes, canales de atención o motivos de consulta rápida.'
+                  : 'Administra sedes de venta, tipos de pago, motivos de reclamo o preguntas del formulario.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfigModalTab('variables');
+                setConfigModalInitialKey('tiendas');
+                setIsConfigModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              title="Eliminar o agregar tiendas y sedes"
+            >
+              <Store className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Tiendas / Sedes</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setConfigModalTab('variables');
+                setConfigModalInitialKey(isConsultaMode ? 'consultaMotivos' : 'motivos');
+                setIsConfigModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              title="Eliminar o agregar motivos"
+            >
+              <Tag className="w-3.5 h-3.5 text-blue-600" />
+              <span>{isConsultaMode ? 'Motivos Consulta' : 'Motivos Reclamo'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setConfigModalTab('variables');
+                setConfigModalInitialKey(isConsultaMode ? 'consultaMotivos' : 'tiendas');
+                setIsConfigModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#161c36] hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+            >
+              <Sliders className="w-3.5 h-3.5 text-blue-400" />
+              <span>Personalizar Todo</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Validation Errors Alert if any */}
@@ -777,16 +864,15 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
                 Canal de Atención <span className="text-rose-600">*</span>
               </label>
               <select
-                value={formValues.canal || 'WhatsApp'}
+                value={formValues.canal || (masterOptions.canales[0] || 'WhatsApp')}
                 onChange={(e) => handleInputChange('canal', e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
-                <option value="WhatsApp">WhatsApp</option>
-                <option value="Instagram">Instagram</option>
-                <option value="TikTok">TikTok</option>
-                <option value="info@sicurezza.pe">Correo info@sicurezza.pe</option>
-                <option value="Presencial Tienda">Presencial Tienda</option>
-                <option value="Teléfono">Llamada Telefónica</option>
+                {masterOptions.canales.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -810,17 +896,15 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
                 Motivo de Consulta <span className="text-rose-600">*</span>
               </label>
               <select
-                value={formValues.motivo || 'Stock y Disponibilidad'}
+                value={formValues.motivo || (masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto')}
                 onChange={(e) => handleInputChange('motivo', e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
-                <option value="Stock y Disponibilidad">Stock y Disponibilidad de Producto</option>
-                <option value="Tallas y Medidas">Guía de Tallas y Asesoría de Medidas</option>
-                <option value="Tiendas y Horarios">Ubicación y Horarios de Tiendas Físicas</option>
-                <option value="Tiempos de Envío">Tiempos y Costos de Envío / Courier</option>
-                <option value="Promociones y Precios">Promociones, Descuentos y Cupones</option>
-                <option value="Estado de Pedido">Consulta de Pedido Existente</option>
-                <option value="Otro">Otra Consulta General</option>
+                {masterOptions.consultaMotivos.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -830,18 +914,15 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
                 Tienda o Sede <span className="text-slate-400 font-normal">(Opcional)</span>
               </label>
               <select
-                value={formValues.origenVenta || 'Canales Digitales'}
+                value={formValues.origenVenta || (masterOptions.tiendas[0] || 'Canales Digitales / Web')}
                 onChange={(e) => handleInputChange('origenVenta', e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
-                <option value="Canales Digitales">Canales Digitales / Web</option>
-                <option value="Tda. Jockey Plaza">Tda. Jockey Plaza</option>
-                <option value="Tda. El Polo">Tda. El Polo</option>
-                <option value="Tda. San Miguel">Tda. San Miguel</option>
-                <option value="Tda. Salaverry">Tda. Salaverry</option>
-                <option value="Tda. Alcázar">Tda. Alcázar</option>
-                <option value="Tda. Mall Plaza Trujillo">Tda. Mall Plaza Trujillo</option>
-                <option value="Tda. Arequipa">Tda. Arequipa</option>
+                {masterOptions.tiendas.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1208,6 +1289,19 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
           </button>
         </div>
       </div>
+
+      {/* MODAL DIRECTO DE CONFIGURACIÓN DE VARIABLES Y FORMULARIO */}
+      <FieldConfiguratorModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        activeCaseType={formValues.tipoCaso}
+        initialTab={configModalTab}
+        initialListKey={configModalInitialKey}
+        onFieldUpdated={() => {
+          setConfiguredFields(getStoredFormFields());
+          setMasterOptions(getMasterOptions());
+        }}
+      />
     </form>
   );
 };

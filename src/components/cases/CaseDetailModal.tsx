@@ -335,6 +335,27 @@ export const CaseDetailModal: React.FC<CaseDetailModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Historial de Acciones y Seguimientos */}
+          {caseItem.historialSeguimientos && caseItem.historialSeguimientos.length > 0 && (
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+              <h4 className="font-bold text-slate-900 flex items-center gap-2 uppercase text-[11px] tracking-wider text-blue-900">
+                <Bell className="w-3.5 h-3.5 text-blue-600" />
+                <span>Bitácora de Acciones y Seguimientos Realizados ({caseItem.historialSeguimientos.length})</span>
+              </h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {caseItem.historialSeguimientos.map((item, idx) => (
+                  <div key={item.id || idx} className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                      <span className="font-bold text-blue-700">{item.usuario}</span>
+                      <span>{new Date(item.fecha).toLocaleString('es-PE')}</span>
+                    </div>
+                    <p className="text-xs text-slate-800 whitespace-pre-wrap">{item.nota}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}

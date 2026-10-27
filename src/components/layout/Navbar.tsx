@@ -16,7 +16,7 @@ import { CaseItem } from '../../types/case';
 
 interface NavbarProps {
   onOpenFirebaseModal: () => void;
-  onOpenFieldConfigurator: () => void;
+  onOpenFieldConfigurator?: () => void;
   cases?: CaseItem[];
   onOpenFollowUpsView?: () => void;
   onViewCaseDetail?: (item: CaseItem) => void;
@@ -102,16 +102,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Database className="w-3.5 h-3.5 text-blue-600" />
           </button>
 
-          {/* Field Configurator shortcut */}
-          <button
-            type="button"
-            onClick={onOpenFieldConfigurator}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-200 transition-colors cursor-pointer"
-            title="Gestor de preguntas y opciones del formulario"
-          >
-            <Sliders className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">Configurar Campos</span>
-          </button>
 
           {/* Quick Alerts Dropdown */}
           {onOpenFollowUpsView && onViewCaseDetail && (

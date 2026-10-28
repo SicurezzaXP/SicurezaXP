@@ -11,6 +11,8 @@ import {
   FileText,
   BarChart3,
   Layers,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { CaseFilterState, CaseItem } from '../../types/case';
 import { isDateInPeruRange, formatDisplayDateOnly, getPeruDateString } from '../../utils/dateUtils';
@@ -142,7 +144,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
   ]);
 
   const toggleColumn = (key: string) => {
-    setSelectedColumns((prev) => ({ ...prev, [key]: !prev[key] }));
+    setSelectedColumns((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   const selectAllColumns = () => {
@@ -161,10 +166,50 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
     setSelectedColumns(map);
   };
 
+  const restoreDefaultColumns = () => {
+    const map: Record<string, boolean> = {};
+    exportColumns.forEach((c) => {
+      map[c.key] = c.defaultSelected;
+    });
+    setSelectedColumns(map);
+  };
+
+  const selectConsultaColumns = () => {
+    const consultaKeys = new Set([
+      'id',
+      'nroCasoDni',
+      'nombresApellidos',
+      'fechaIngreso',
+      'canal',
+      'telefonoCliente',
+      'correoCliente',
+      'numeroPedido',
+      'origenVenta',
+      'tipoCaso',
+      'motivo',
+      'solicitudCliente',
+      'solucionBrindada',
+      'cerroEnFcr',
+      'detalleSolucion',
+      'estado',
+      'cierre',
+      'fechaCierre',
+      'createdBy',
+    ]);
+    const map: Record<string, boolean> = {};
+    exportColumns.forEach((c) => {
+      map[c.key] = consultaKeys.has(c.key as string);
+    });
+    setSelectedColumns(map);
+  };
+
+  const [columnSearch, setColumnSearch] = useState('');
+
   const generateDataRows = () => {
     const activeCols = exportColumns.filter((c) => selectedColumns[c.key]);
 
     return filteredCases.map((c) => {
+      const isConsulta = c.tipoCaso === 'Consulta';
       const row: Record<string, any> = {};
       activeCols.forEach((col) => {
         let val: any = (c as any)[col.key];
@@ -182,6 +227,37 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
         // Check customFields if value missing
         if (val === undefined && c.customFields && c.customFields[col.key]) {
           val = c.customFields[col.key]?.value ?? c.customFields[col.key];
+        }
+
+        // For Consulta Rápida: strictly ensure non-applicable Solicitud fields are exported as blank/empty
+        if (isConsulta) {
+          const fastConsultationIrrelevantKeys = [
+            'tipoPago',
+            'talla',
+            'color',
+            'submotivo',
+            'sku',
+            'campanaMkt',
+            'numeroBoleta',
+            'fechaDerivacion',
+            'quejaPersonalInvolucrado',
+            'sucursalQueja',
+            'fechaAtencion',
+            'horarioAtencion',
+            'sustentosAtencion',
+            'fechaVenta',
+          ];
+          if (fastConsultationIrrelevantKeys.includes(col.key)) {
+            val = '';
+          }
+          if (col.key === 'nroCasoDni' && (val === 'Sin DNI' || val === 'N/A')) val = '';
+          if (col.key === 'telefonoCliente' && val === 'N/A') val = '';
+          if (col.key === 'correoCliente' && val === 'N/A') val = '';
+          if (col.key === 'numeroPedido' && val === 'N/A') val = '';
+          if (col.key === 'producto' && val === 'Consulta de Producto') val = '';
+          if (col.key === 'solucionBrindada' && (val === 'Cambio - Talla' || !val)) {
+            val = 'Orientación / Información';
+          }
         }
 
         row[col.label] = val !== undefined && val !== null ? val : '';
@@ -434,56 +510,114 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
 
         {/* Column Selectors Grid */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <Layers className="w-4 h-4 text-blue-600" />
               <span>Selección de Columnas a Incluir en el Archivo</span>
             </span>
-            <div className="flex items-center gap-2 text-xs">
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               <button
                 type="button"
                 onClick={selectAllColumns}
-                className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline"
+                className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold cursor-pointer border border-blue-200 transition-colors"
+                title="Seleccionar todas las columnas disponibles"
               >
                 Marcar todas
               </button>
-              <span className="text-slate-300">|</span>
               <button
                 type="button"
                 onClick={deselectAllColumns}
-                className="text-slate-500 hover:text-slate-800 font-semibold cursor-pointer underline"
+                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold cursor-pointer border border-slate-200 transition-colors"
+                title="Desmarcar todas las columnas"
               >
                 Desmarcar todas
+              </button>
+              <button
+                type="button"
+                onClick={restoreDefaultColumns}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 font-semibold cursor-pointer border border-slate-200 transition-colors"
+                title="Restaurar las columnas oficiales predeterminadas"
+              >
+                <RotateCcw className="w-3 h-3 text-slate-500" />
+                <span>Por defecto</span>
+              </button>
+              <button
+                type="button"
+                onClick={selectConsultaColumns}
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-semibold cursor-pointer border border-indigo-200 transition-colors"
+                title="Seleccionar únicamente las columnas relevantes para consultas rápidas"
+              >
+                Solo Consulta Rápida
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {exportColumns.map((col) => {
-              const isChecked = selectedColumns[col.key];
-              return (
-                <label
-                  key={col.key}
-                  onClick={() => toggleColumn(col.key)}
-                  className={`flex items-center gap-2 p-2 rounded-xl text-xs font-medium border cursor-pointer transition-colors ${
-                    isChecked
-                      ? 'bg-blue-50 border-blue-200 text-blue-900'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => {}} // handled by container
-                    className="w-3.5 h-3.5 rounded text-blue-600 border-slate-300 pointer-events-none"
-                  />
-                  <span className="truncate" title={col.label}>
-                    {col.label}
-                  </span>
-                </label>
-              );
-            })}
+          {/* Column Search Filter */}
+          <div className="relative max-w-sm">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={columnSearch}
+              onChange={(e) => setColumnSearch(e.target.value)}
+              placeholder="Buscar columna por nombre..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+            />
+            {columnSearch && (
+              <button
+                type="button"
+                onClick={() => setColumnSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                ×
+              </button>
+            )}
           </div>
+
+          {/* Column Buttons Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {exportColumns
+              .filter((c) =>
+                columnSearch.trim() === ''
+                  ? true
+                  : c.label.toLowerCase().includes(columnSearch.trim().toLowerCase())
+              )
+              .map((col) => {
+                const isChecked = Boolean(selectedColumns[col.key]);
+                return (
+                  <button
+                    key={col.key}
+                    type="button"
+                    onClick={() => toggleColumn(col.key)}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl text-xs font-medium border text-left cursor-pointer transition-all select-none ${
+                      isChecked
+                        ? 'bg-blue-50/80 border-blue-300 text-blue-900 shadow-xs ring-1 ring-blue-500/20'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    {isChecked ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600 shrink-0" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-300 shrink-0" />
+                    )}
+                    <span className="truncate flex-1 font-semibold" title={col.label}>
+                      {col.label}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+
+          {exportColumns.filter((c) =>
+            columnSearch.trim() === ''
+              ? true
+              : c.label.toLowerCase().includes(columnSearch.trim().toLowerCase())
+          ).length === 0 && (
+            <div className="text-center py-6 text-xs text-slate-400">
+              No se encontraron columnas que coincidan con "{columnSearch}"
+            </div>
+          )}
         </div>
       </div>
     </div>

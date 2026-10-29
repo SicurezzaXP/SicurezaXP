@@ -15,7 +15,12 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { CaseFilterState, CaseItem } from '../../types/case';
-import { isDateInPeruRange, formatDisplayDateOnly, getPeruDateString } from '../../utils/dateUtils';
+import {
+  isDateInPeruRange,
+  formatDisplayDateOnly,
+  getPeruDateString,
+  calculateDatePresetRange,
+} from '../../utils/dateUtils';
 import {
   ORIGENES_VENTA,
   TIPOS_CASO,
@@ -91,8 +96,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
   }, []);
 
   // Filter State
-  const [reportStartDate, setReportStartDate] = useState(defaultFilters.fechaInicio);
-  const [reportEndDate, setReportEndDate] = useState(defaultFilters.fechaFin);
+  const peruToday = getPeruDateString();
+  const [reportStartDate, setReportStartDate] = useState(
+    () => defaultFilters.fechaInicio || calculateDatePresetRange('ultimos_30_dias').inicio
+  );
+  // Guarantee reportEndDate is always at least peruToday (or later if selected)
+  const [reportEndDate, setReportEndDate] = useState<string>(() => {
+    if (!defaultFilters.fechaFin || defaultFilters.fechaFin < peruToday) {
+      return peruToday;
+    }
+    return defaultFilters.fechaFin;
+  });
   const [filterStore, setFilterStore] = useState(defaultFilters.origenVenta || defaultFilters.tienda || '');
   const [filterTipo, setFilterTipo] = useState(defaultFilters.tipoCaso || '');
   const [filterMotive, setFilterMotive] = useState(defaultFilters.motivo || defaultFilters.categoria || '');
@@ -389,6 +403,71 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ allCases, defaultFilte
               <span>CSV</span>
             </button>
           </div>
+        </div>
+
+        {/* Quick Date Presets Bar */}
+        <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100 text-xs">
+          <span className="font-bold text-[11px] text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
+            <span>Período Rápido:</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setReportStartDate(peruToday);
+              setReportEndDate(peruToday);
+            }}
+            className={`px-3 py-1 rounded-lg font-bold border transition-colors cursor-pointer ${
+              reportStartDate === peruToday && reportEndDate === peruToday
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-blue-50/80 hover:bg-blue-100 text-blue-800 border-blue-200'
+            }`}
+          >
+            Hoy ({peruToday.split('-').slice(1).reverse().join('/')})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const r = calculateDatePresetRange('ultimos_7_dias');
+              setReportStartDate(r.inicio);
+              setReportEndDate(peruToday);
+            }}
+            className="px-2.5 py-1 rounded-lg font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+          >
+            Últimos 7 días
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const r = calculateDatePresetRange('este_mes');
+              setReportStartDate(r.inicio);
+              setReportEndDate(peruToday);
+            }}
+            className="px-2.5 py-1 rounded-lg font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+          >
+            Este Mes
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const r = calculateDatePresetRange('ultimos_30_dias');
+              setReportStartDate(r.inicio);
+              setReportEndDate(peruToday);
+            }}
+            className="px-2.5 py-1 rounded-lg font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+          >
+            Últimos 30 días
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setReportStartDate('2024-01-01');
+              setReportEndDate(peruToday);
+            }}
+            className="px-2.5 py-1 rounded-lg font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+          >
+            Todo el Histórico
+          </button>
         </div>
 
         {/* Filters Grid */}

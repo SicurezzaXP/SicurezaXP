@@ -16,7 +16,7 @@ import { CaseDetailModal } from './components/cases/CaseDetailModal';
 import { CaseEditModal } from './components/cases/CaseEditModal';
 import { CaseFilterState, CaseItem } from './types/case';
 import { subscribeToCases } from './services/db';
-import { calculateDatePresetRange, isDateInPeruRange } from './utils/dateUtils';
+import { calculateDatePresetRange, isDateInPeruRange, getPeruDateString } from './utils/dateUtils';
 import { getCaseFollowUpInfo } from './utils/followUpUtils';
 import {
   LayoutDashboard,
@@ -45,10 +45,11 @@ function MainApp() {
   const [selectedCaseForEdit, setSelectedCaseForEdit] = useState<CaseItem | null>(null);
 
   // Global Date and Attribute Filters
+  const peruToday = getPeruDateString();
   const initialRange = useMemo(() => calculateDatePresetRange('ultimos_30_dias'), []);
   const [filters, setFilters] = useState<CaseFilterState>({
     fechaInicio: initialRange.inicio,
-    fechaFin: initialRange.fin,
+    fechaFin: peruToday,
     preset: 'ultimos_30_dias',
     origenVenta: '',
     tipoCaso: '',

@@ -63,6 +63,23 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
   const [solicitudCliente, setSolicitudCliente] = useState(
     caseItem?.solicitudCliente || caseItem?.descripcion || ''
   );
+  const [canal, setCanal] = useState(caseItem?.canal || 'WhatsApp');
+  const [clienteNombre, setClienteNombre] = useState(
+    caseItem?.nombresApellidos || caseItem?.clienteNombre || ''
+  );
+  const [clienteTelefono, setClienteTelefono] = useState(
+    caseItem?.telefonoCliente || caseItem?.clienteTelefono || ''
+  );
+
+  // Dynamic available motivos depending on tipoCaso
+  const availableMotivos = React.useMemo(() => {
+    const baseList =
+      tipoCaso === 'Consulta' ? masterOptions.consultaMotivos : masterOptions.motivos;
+    if (motivo && !baseList.includes(motivo)) {
+      return [motivo, ...baseList];
+    }
+    return baseList;
+  }, [tipoCaso, masterOptions, motivo]);
 
   // Follow-up alert fields
   const [requiereSeguimiento, setRequiereSeguimiento] = useState<boolean>(
@@ -92,6 +109,9 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
       setMotivo(caseItem.motivo || caseItem.categoria || 'Producto');
       setOrigenVenta(caseItem.origenVenta || caseItem.tienda || 'Tda. Jockey Plaza');
       setSolicitudCliente(caseItem.solicitudCliente || caseItem.descripcion || '');
+      setCanal(caseItem.canal || 'WhatsApp');
+      setClienteNombre(caseItem.nombresApellidos || caseItem.clienteNombre || '');
+      setClienteTelefono(caseItem.telefonoCliente || caseItem.clienteTelefono || '');
     }
   }, [caseItem]);
 
@@ -115,6 +135,9 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
         motivo,
         origenVenta,
         solicitudCliente,
+        canal,
+        nombresApellidos: clienteNombre,
+        telefonoCliente: clienteTelefono,
         // Alertas y Seguimiento
         requiereSeguimiento: estado === 'Cerrado' ? false : requiereSeguimiento,
         fechaProximoSeguimiento: estado === 'Cerrado' ? '' : fechaProximoSeguimiento,
@@ -125,6 +148,8 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
         tienda: origenVenta,
         categoria: motivo,
         descripcion: solicitudCliente,
+        clienteNombre,
+        clienteTelefono,
         clienteConforme: cierre === 'Procede' ? 'Sí' : 'En seguimiento',
       };
 
@@ -347,6 +372,50 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
             )}
           </div>
 
+          {/* Datos del Cliente y Canal */}
+          <div className="border-t border-slate-200 pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Cliente
+              </label>
+              <input
+                type="text"
+                value={clienteNombre}
+                placeholder="Nombre de la clienta"
+                onChange={(e) => setClienteNombre(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Teléfono / WhatsApp
+              </label>
+              <input
+                type="text"
+                value={clienteTelefono}
+                placeholder="Teléfono"
+                onChange={(e) => setClienteTelefono(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
+                Canal de Atención
+              </label>
+              <select
+                value={canal}
+                onChange={(e) => setCanal(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {masterOptions.canales.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Sede / Tipo / Motivo */}
           <div className="border-t border-slate-200 pt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -355,7 +424,15 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
               </label>
               <select
                 value={tipoCaso}
-                onChange={(e) => setTipoCaso(e.target.value)}
+                onChange={(e) => {
+                  const newTipo = e.target.value;
+                  setTipoCaso(newTipo);
+                  if (newTipo === 'Consulta') {
+                    setMotivo(masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto');
+                  } else {
+                    setMotivo(masterOptions.motivos[0] || 'Producto');
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
               >
                 {TIPOS_CASO.map((t) => (
@@ -368,14 +445,14 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
 
             <div>
               <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
-                Motivo
+                Motivo ({tipoCaso === 'Consulta' ? 'Consulta' : 'Reclamo/Solicitud'})
               </label>
               <select
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
-                {masterOptions.motivos.map((m) => (
+                {availableMotivos.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
@@ -399,6 +476,22 @@ export const CaseEditModal: React.FC<CaseEditModalProps> = ({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Solicitud / Manifestación / Consulta del cliente */}
+          <div className="border-t border-slate-200 pt-3">
+            <label className="block text-slate-700 font-bold uppercase text-[10px] tracking-wider mb-1">
+              {tipoCaso === 'Consulta'
+                ? '¿Qué consultó el cliente? (Manifestación / Detalle) *'
+                : 'Solicitud / Manifestación de la Clienta (Descripción) *'}
+            </label>
+            <textarea
+              rows={3}
+              value={solicitudCliente}
+              onChange={(e) => setSolicitudCliente(e.target.value)}
+              placeholder="Detalle de lo que consultó o reclamó la clienta..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* Buttons */}

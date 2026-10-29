@@ -201,7 +201,15 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   };
 
   const handleInputChange = (fieldId: string, value: any) => {
-    setFormValues((prev) => ({ ...prev, [fieldId]: value }));
+    setFormValues((prev) => {
+      const updated = { ...prev, [fieldId]: value };
+      if (fieldId === 'motivo') {
+        updated.motivoConsulta = value;
+      } else if (fieldId === 'motivoConsulta') {
+        updated.motivo = value;
+      }
+      return updated;
+    });
     if (validationErrors[fieldId]) {
       setValidationErrors((prev) => {
         const next = { ...prev };
@@ -214,11 +222,16 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
   // Fully decoupled selection of case type
   const handleSelectCaseType = (type: string) => {
     if (type === 'Consulta') {
+      const selectedConsultaMotivo = formValues.motivo && masterOptions.consultaMotivos.includes(formValues.motivo)
+        ? formValues.motivo
+        : masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto';
+
       setFormValues((prev) => ({
+        ...prev,
         tipoCaso: 'Consulta',
         canal: prev.canal || masterOptions.canales[0] || 'WhatsApp',
-        motivo: prev.motivoConsulta || masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto',
-        motivoConsulta: prev.motivoConsulta || masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto',
+        motivo: selectedConsultaMotivo,
+        motivoConsulta: selectedConsultaMotivo,
         origenVenta: prev.origenVenta || masterOptions.tiendas[0] || 'Canales Digitales / Web',
         solicitudCliente: prev.solicitudCliente || '',
         detalleSolucion: prev.detalleSolucion || '',
@@ -337,7 +350,9 @@ export const CaseRegistrationForm: React.FC<CaseRegistrationFormProps> = ({
           formValues.nombresApellidos || 'Cliente Consulta General'
         ).trim();
         const consultaCanal = formValues.canal || masterOptions.canales[0] || 'WhatsApp';
-        const consultaMotivo = formValues.motivoConsulta || formValues.motivo || masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto';
+        const consultaMotivo = String(
+          formValues.motivo || formValues.motivoConsulta || masterOptions.consultaMotivos[0] || 'Stock y Disponibilidad de Producto'
+        ).trim();
         const consultaTienda = formValues.origenVenta || '';
 
         newCase = {
